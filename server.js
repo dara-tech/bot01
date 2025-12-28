@@ -25,8 +25,16 @@ if (!GEMINI_API_KEY) {
   process.exit(1);
 }
 
-// Initialize Telegram Bot
-const bot = new TelegramBot(TELEGRAM_TOKEN, { polling: true });
+// Initialize Telegram Bot with better error handling
+const bot = new TelegramBot(TELEGRAM_TOKEN, { 
+  polling: {
+    interval: 300,
+    autoStart: true,
+    params: {
+      timeout: 10
+    }
+  }
+});
 
 // ទាញយក bot info ដើម្បីពិនិត្យ mentions
 let botUsername = null;
@@ -331,10 +339,20 @@ bot.on('message', async (msg) => {
     cleanMessage += urlInfo;
   }
 
+  // Check if user wants to generate an image
+  const imageGenKeywords = [
+    'បង្កើតរូប', 'គូររូប', 'គូរ', 'generate image', 'create image', 
+    'draw', 'គូរឲ្យ', 'បង្កើត', 'រូបភាព', 'nanobanana'
+  ];
+  
+  const wantsImageGen = cleanMessage && imageGenKeywords.some(keyword => 
+    cleanMessage.toLowerCase().includes(keyword.toLowerCase())
+  );
+
   // មុខងាររក្សា typing indicator
   const keepTyping = async () => {
     try {
-      await bot.sendChatAction(chatId, 'typing');
+      await bot.sendChatAction(chatId, wantsImageGen ? 'upload_photo' : 'typing');
     } catch (error) {
       // មិនយក errors
     }
@@ -348,6 +366,57 @@ bot.on('message', async (msg) => {
       await bot.sendMessage(chatId, 'សូមដំឡើង GEMINI_API_KEY ក្នុង .env file!');
       return;
     }
+
+    // Handle image generation request
+    if (wantsImageGen && !imageBuffer) {
+      // Extract prompt (remove keywords)
+      let imagePrompt = cleanMessage;
+      for (const keyword of imageGenKeywords) {
+        imagePrompt = imagePrompt.replace(new RegExp(keyword, 'gi'), '').trim();
+      }
+      
+      // If no prompt left, use a default
+      if (!imagePrompt || imagePrompt.length < 3) {
+        imagePrompt = 'beautiful artistic image';
+      }
+
+      console.log(`🎨 Image generation requested: ${imagePrompt}`);
+      
+      // Generate image
+      const imageResult = await geminiService.generateImage(imagePrompt, '1:1', '1K');
+      
+      clearInterval(typingInterval);
+      
+      console.log(`📊 Image generation result:`, {
+        success: imageResult.success,
+        hasImageData: !!imageResult.imageData,
+        imageDataLength: imageResult.imageData?.length || 0,
+        error: imageResult.error
+      });
+      
+      if (imageResult.success && imageResult.imageData) {
+        try {
+          // Convert base64 to buffer
+          const imageBuffer = Buffer.from(imageResult.imageData, 'base64');
+          console.log(`✅ Converted to buffer: ${imageBuffer.length} bytes`);
+          
+          // Send image to Telegram
+          await bot.sendPhoto(chatId, imageBuffer, {
+            caption: `✅ រូបដែលបង្កើតដោយ: "${imagePrompt}"`
+          });
+          console.log(`✅ Image generated and sent successfully!`);
+        } catch (sendError) {
+          console.error('❌ Error sending image to Telegram:', sendError);
+          await bot.sendMessage(chatId, `អូ... មិនអាចផ្ញើរូបបាន: ${sendError.message}`);
+        }
+      } else {
+        console.log(`❌ Image generation failed: ${imageResult.error || 'Unknown error'}`);
+        await bot.sendMessage(chatId, `អូ... មិនអាចបង្កើតរូបបាន: ${imageResult.error || 'មានបញ្ហាបន្តិច'}`);
+      }
+      return;
+    }
+
+    // Normal text response
     const response = await geminiService.generateKhmerMemeResponse(cleanMessage, chatId, imageBuffer);
     
     clearInterval(typingInterval);
@@ -381,7 +450,7 @@ bot.onText(/\/start/, async (msg) => {
 // ដោះស្រាយ /help command
 bot.onText(/\/help/, async (msg) => {
   const chatId = msg.chat.id;
-  const helpMessage = `📖 ជំនួយ:\n\n• ផ្ញើសារមកខ្ញុំ ហើយខ្ញុំនឹងឆ្លើយតបជាភាសាខ្មែរដោយប្រើប្រាស់រចនាប័ទ្ម meme!\n• ខ្ញុំប្រើប្រាស់ Gemini AI ដើម្បីបង្កើតចម្លើយ\n• ខ្ញុំអាចចងចាំការសន្ទនារបស់យើង!\n• ប្រើ /start ដើម្បីចាប់ផ្តើមការសន្ទនាថ្មី\n• គ្រាន់តែជជែកជាមួយខ្ញុំដូចជាមិត្តភក្តិ! 😊`;
+  const helpMessage = `📖 ជំនួយ:\n\n• ផ្ញើសារមកខ្ញុំ ហើយខ្ញុំនឹងឆ្លើយតបជាភាសាខ្មែរដោយប្រើប្រាស់រចនាប័ទ្ម meme!\n• ខ្ញុំប្រើប្រាស់ Gemini AI ដើម្បីបង្កើតចម្លើយ\n• ខ្ញុំអាចចងចាំការសន្ទនារបស់យើង!\n• 🎨 បង្កើតរូប: សរសេរ "បង្កើតរូប..." ឬ "គូររូប..." ដើម្បីបង្កើតរូបដោយ AI\n• ប្រើ /start ដើម្បីចាប់ផ្តើមការសន្ទនាថ្មី\n• គ្រាន់តែជជែកជាមួយខ្ញុំដូចជាមិត្តភក្តិ! 😊`;
   await bot.sendMessage(chatId, helpMessage);
 });
 
@@ -396,7 +465,16 @@ bot.onText(/\/clear/, async (msg) => {
 
 // ដោះស្រាយ errors
 bot.on('polling_error', (error) => {
-  console.error('កំហុស polling:', error);
+  if (error.code === 'ETELEGRAM' && error.response && error.response.body) {
+    const errorBody = error.response.body;
+    if (errorBody.error_code === 409) {
+      console.error('⚠️  មាន bot instance ផ្សេងកំពុងដំណើរការរួចហើយ!');
+      console.error('⚠️  សូមបិទ instance ផ្សេងទៀត ឬរង់ចាំសិន...');
+      // Don't exit, just log - the bot will retry
+      return;
+    }
+  }
+  console.error('កំហុស polling:', error.message || error);
 });
 
 // ចាប់ផ្តើម Express server
