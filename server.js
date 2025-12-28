@@ -2,6 +2,8 @@ require('dotenv').config();
 const express = require('express');
 const TelegramBot = require('node-telegram-bot-api');
 const GeminiService = require('./services/geminiService');
+const fetch = require('node-fetch');
+const cheerio = require('cheerio');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -41,6 +43,96 @@ if (GEMINI_API_KEY) {
 
 // Express middleware
 app.use(express.json());
+
+// Function to extract URLs from message text
+function extractUrls(text, entities) {
+  const urls = [];
+  
+  // Check Telegram entities for URLs
+  if (entities) {
+    for (const entity of entities) {
+      if (entity.type === 'url') {
+        const url = text.substring(entity.offset, entity.offset + entity.length);
+        urls.push(url);
+      } else if (entity.type === 'text_link') {
+        urls.push(entity.url);
+      }
+    }
+  }
+  
+  // Also check for URLs using regex (for cases where entities might not catch them)
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  const matches = text.match(urlRegex);
+  if (matches) {
+    matches.forEach(url => {
+      if (!urls.includes(url)) {
+        urls.push(url);
+      }
+    });
+  }
+  
+  return urls;
+}
+
+// Function to fetch and parse URL content
+async function fetchUrlContent(url) {
+  try {
+    console.log(`🔗 Fetching URL: ${url}`);
+    
+    // Set headers to mimic a browser
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1'
+      },
+      timeout: 10000 // 10 second timeout
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const html = await response.text();
+    const $ = cheerio.load(html);
+    
+    // Remove script and style elements
+    $('script, style, noscript').remove();
+    
+    // Extract title
+    const title = $('title').text().trim() || $('meta[property="og:title"]').attr('content') || '';
+    
+    // Extract description
+    const description = $('meta[name="description"]').attr('content') || 
+                       $('meta[property="og:description"]').attr('content') || 
+                       $('meta[name="twitter:description"]').attr('content') || '';
+    
+    // Extract main content
+    const bodyText = $('body').text().replace(/\s+/g, ' ').trim();
+    const contentPreview = bodyText.substring(0, 1000); // Limit to 1000 chars
+    
+    // Extract images
+    const ogImage = $('meta[property="og:image"]').attr('content') || 
+                   $('meta[name="twitter:image"]').attr('content') || '';
+    
+    return {
+      url,
+      title,
+      description,
+      content: contentPreview,
+      image: ogImage
+    };
+  } catch (error) {
+    console.error(`❌ Error fetching URL ${url}:`, error.message);
+    return {
+      url,
+      error: error.message
+    };
+  }
+}
 
 // Health check endpoint
 app.get('/', (req, res) => {
@@ -172,10 +264,55 @@ bot.on('message', async (msg) => {
     return;
   }
 
+  // Detect URLs in message
+  let urlContent = null;
+  if (userMessage) {
+    const urls = extractUrls(userMessage, entities);
+    if (urls.length > 0) {
+      console.log(`🔗 Found ${urls.length} URL(s) in message`);
+      // Fetch the first URL (or you could fetch all)
+      const fetchedContent = await fetchUrlContent(urls[0]);
+      if (fetchedContent && !fetchedContent.error) {
+        urlContent = fetchedContent;
+        console.log(`✅ Fetched content from URL: ${fetchedContent.title || 'No title'}`);
+      }
+    }
+  }
+
   // លុប bot mention ចេញពីសារ (ប្រសិនបើមាន)
   let cleanMessage = userMessage;
   if (isMentioned && botUsername) {
     cleanMessage = userMessage.replace(new RegExp(`@${botUsername}\\s*`, 'gi'), '').trim();
+  }
+  
+  // Fetch image from URL if available (and no image already attached)
+  if (urlContent && !urlContent.error && urlContent.image && !imageBuffer) {
+    try {
+      console.log(`🖼️  Fetching image from URL: ${urlContent.image}`);
+      const imageResponse = await fetch(urlContent.image);
+      if (imageResponse.ok) {
+        const imageArrayBuffer = await imageResponse.arrayBuffer();
+        imageBuffer = Buffer.from(imageArrayBuffer);
+        console.log(`✅ Fetched image from URL (${imageBuffer.length} bytes)`);
+      }
+    } catch (error) {
+      console.error('❌ Error fetching image from URL:', error.message);
+    }
+  }
+  
+  // Append URL content to message if available
+  if (urlContent && !urlContent.error) {
+    let urlInfo = `\n\n[អត្ថបទពីគេហទំព័រ]\n`;
+    if (urlContent.title) {
+      urlInfo += `ចំណងជើង: ${urlContent.title}\n`;
+    }
+    if (urlContent.description) {
+      urlInfo += `បរិយាយ: ${urlContent.description}\n`;
+    }
+    if (urlContent.content) {
+      urlInfo += `មាតិកា: ${urlContent.content.substring(0, 500)}...`;
+    }
+    cleanMessage += urlInfo;
   }
 
   // មុខងាររក្សា typing indicator
