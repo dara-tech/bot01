@@ -149,6 +149,22 @@ app.post(`/webhook/${TELEGRAM_TOKEN}`, (req, res) => {
   res.sendStatus(200);
 });
 
+// Keep-alive ping function
+function keepAlive() {
+  const url = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
+  
+  fetch(url)
+    .then(response => {
+      console.log(`🏓 Keep-alive ping successful: ${response.status}`);
+    })
+    .catch(error => {
+      console.log(`⚠️  Keep-alive ping failed: ${error.message}`);
+    });
+}
+
+// Set up keep-alive ping every 12 minutes (720000 ms)
+setInterval(keepAlive, 12 * 60 * 1000);
+
 // ដោះស្រាយ Telegram messages
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
@@ -388,6 +404,7 @@ app.listen(PORT, async () => {
   console.log(`🚀 Server កំពុងដំណើរការនៅ port ${PORT}`);
   console.log(`🤖 Telegram bot សកម្ម!`);
   console.log(`🧠 Gemini AI ត្រូវបានកំណត់!`);
+  console.log(`🏓 Keep-alive ping scheduled every 12 minutes`);
   if (TELEGRAM_CHAT_ID) {
     console.log(`📱 Bot ត្រូវបានកំណត់សម្រាប់ chat ID: ${TELEGRAM_CHAT_ID}`);
   }
@@ -403,4 +420,3 @@ app.listen(PORT, async () => {
     }
   }
 });
-
