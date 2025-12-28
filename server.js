@@ -382,8 +382,8 @@ bot.on('message', async (msg) => {
 
       console.log(`🎨 Image generation requested: ${imagePrompt}`);
       
-      // Generate image
-      const imageResult = await geminiService.generateImage(imagePrompt, '1:1', '1K');
+      // Generate image with conversation context
+      const imageResult = await geminiService.generateImage(imagePrompt, chatId, '1:1', '1K');
       
       clearInterval(typingInterval);
       
@@ -400,11 +400,18 @@ bot.on('message', async (msg) => {
           const imageBuffer = Buffer.from(imageResult.imageData, 'base64');
           console.log(`✅ Converted to buffer: ${imageBuffer.length} bytes`);
           
-          // Send image to Telegram
+          // Send image to Telegram with a contextual response
+          // Generate a contextual response about the image using conversation history
+          const contextualResponse = await geminiService.generateKhmerMemeResponse(
+            `បានបង្កើតរូប: ${imagePrompt}. មានអ្វីចង់ពិពណ៌នាអំពីរូបនេះ?`,
+            chatId,
+            null
+          );
+          
           await bot.sendPhoto(chatId, imageBuffer, {
-            caption: `✅ រូបដែលបង្កើតដោយ: "${imagePrompt}"`
+            caption: contextualResponse || `✅ រូបដែលបង្កើត: ${imagePrompt}`
           });
-          console.log(`✅ Image generated and sent successfully!`);
+          console.log(`✅ Image generated and sent successfully with contextual response!`);
         } catch (sendError) {
           console.error('❌ Error sending image to Telegram:', sendError);
           await bot.sendMessage(chatId, `អូ... មិនអាចផ្ញើរូបបាន: ${sendError.message}`);

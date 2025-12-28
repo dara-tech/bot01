@@ -133,17 +133,39 @@ class GeminiService {
     }
   }
 
-  // Generate image using Gemini Imagen (Nano Banana Pro)
-  async generateImage(prompt, aspectRatio = '1:1', imageSize = '1K') {
+  // Generate image using Gemini Imagen (Nano Banana Pro) with conversation context
+  async generateImage(prompt, chatId, aspectRatio = '1:1', imageSize = '1K') {
     try {
-      // Use the prompt directly as a string (matching the correct API format)
-      console.log(`🎨 Generating image with prompt: ${prompt.substring(0, 80)}...`);
+      // Get conversation history for context
+      let conversationHistory = this.conversationHistory.get(chatId) || [];
+      
+      // Build context-aware prompt by including recent conversation
+      let contextualPrompt = prompt;
+      if (conversationHistory.length > 0) {
+        // Get last few messages for context (last 3 exchanges = 6 messages)
+        const recentHistory = conversationHistory.slice(-6);
+        let contextSummary = '';
+        
+        for (const msg of recentHistory) {
+          if (msg.role === 'user') {
+            contextSummary += `User: ${msg.text}\n`;
+          } else if (msg.role === 'model') {
+            contextSummary += `Previous response: ${msg.text}\n`;
+          }
+        }
+        
+        // Enhance prompt with context
+        contextualPrompt = `${contextSummary}\nNow generate an image based on: ${prompt}`;
+        console.log(`🎨 Generating image with context (${conversationHistory.length} messages in history)`);
+      }
+      
+      console.log(`🎨 Image prompt: ${prompt.substring(0, 80)}...`);
       
       // Use gemini-2.5-flash-image model for native Gemini image generation
       // Contents should be a string directly - Gemini will generate image natively
       const response = await this.ai.models.generateContent({
         model: 'gemini-2.5-flash-image',
-        contents: prompt, // Pass prompt as string directly
+        contents: contextualPrompt, // Pass context-aware prompt
       });
 
       // Extract image data from response
@@ -171,6 +193,28 @@ class GeminiService {
               console.log(`✅ Found image in part ${i}! Data length: ${part.inlineData.data.length} chars (base64)`);
               console.log(`✅ MIME type: ${part.inlineData.mimeType || 'image/png'}`);
               console.log(`✅ First 50 chars of data: ${part.inlineData.data.substring(0, 50)}...`);
+              
+              // Update conversation history after successful image generation
+              if (chatId) {
+                let conversationHistory = this.conversationHistory.get(chatId) || [];
+                conversationHistory.push({
+                  role: 'user',
+                  text: `បង្កើតរូប: ${prompt}`
+                });
+                conversationHistory.push({
+                  role: 'model',
+                  text: `បានបង្កើតរូបភាព: ${prompt}`
+                });
+                
+                // Keep only last 20 messages
+                if (conversationHistory.length > 40) {
+                  conversationHistory = conversationHistory.slice(-40);
+                }
+                
+                this.conversationHistory.set(chatId, conversationHistory);
+                console.log(`💾 Updated conversation history for image generation`);
+              }
+              
               return {
                 success: true,
                 imageData: part.inlineData.data, // This is base64 string
