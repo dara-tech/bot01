@@ -76,7 +76,7 @@ if (process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
     
     // Validate it's a service account
     if (credsJson.type === 'service_account') {
-      await fs.writeFile(tempCredsFile, process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
+      fsSync.writeFileSync(tempCredsFile, process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
       credentialsPath = tempCredsFile;
       console.log(`📁 Found credentials from GOOGLE_APPLICATION_CREDENTIALS_JSON (temp file created)`);
     } else {

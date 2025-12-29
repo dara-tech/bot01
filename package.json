@@ -1,6 +1,7 @@
 {
   "name": "dara-bot",
   "version": "1.0.0",
+  "type": "commonjs",
   "description": "Telegram bot with Gemini AI for Khmer meme-style text generation",
   "main": "server.js",
   "scripts": {
