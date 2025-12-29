@@ -6,3 +6,9 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# Google Cloud Service Account Credentials
+photoai-*.json
+*-*.json
+*.json
+!package.json
+!package-lock.json
