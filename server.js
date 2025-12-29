@@ -59,13 +59,36 @@ let ttsService = null;
 const fsSync = require('fs');
 
 // Priority order:
-// 1. GOOGLE_APPLICATION_CREDENTIALS from environment
-// 2. Service account file in current directory
-// 3. Old client secret file (will be detected as OAuth and use fallback)
+// 1. GOOGLE_APPLICATION_CREDENTIALS_JSON (JSON content as string - for Render/cloud)
+// 2. GOOGLE_APPLICATION_CREDENTIALS (file path from environment)
+// 3. Service account file in current directory
+// 4. Old client secret file (will be detected as OAuth and use fallback)
 
 let credentialsPath = null;
 
-if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+// Option 1: JSON content as environment variable (for Render/cloud platforms)
+if (process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
+  try {
+    // Create temporary file from JSON string
+    const tempDir = os.tmpdir();
+    const tempCredsFile = path.join(tempDir, `gcp-creds-${Date.now()}.json`);
+    const credsJson = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
+    
+    // Validate it's a service account
+    if (credsJson.type === 'service_account') {
+      await fs.writeFile(tempCredsFile, process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
+      credentialsPath = tempCredsFile;
+      console.log(`📁 Found credentials from GOOGLE_APPLICATION_CREDENTIALS_JSON (temp file created)`);
+    } else {
+      console.warn(`⚠️  GOOGLE_APPLICATION_CREDENTIALS_JSON is not a service account`);
+    }
+  } catch (error) {
+    console.warn(`⚠️  Failed to parse GOOGLE_APPLICATION_CREDENTIALS_JSON: ${error.message}`);
+  }
+}
+
+// Option 2: File path from environment variable
+if (!credentialsPath && process.env.GOOGLE_APPLICATION_CREDENTIALS) {
   try {
     fsSync.accessSync(process.env.GOOGLE_APPLICATION_CREDENTIALS);
     credentialsPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
@@ -75,7 +98,7 @@ if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
   }
 }
 
-// If no env path, try local service account file
+// Option 3: Local service account file
 if (!credentialsPath) {
   const localServiceAccount = path.join(__dirname, 'photoai-478919-1a91cfa646cd.json');
   try {
