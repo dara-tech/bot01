@@ -50,7 +50,14 @@ bot.getMe().then((me) => {
 // Initialize Gemini AI Service
 let geminiService = null;
 if (GEMINI_API_KEY) {
-  geminiService = new GeminiService(GEMINI_API_KEY);
+  try {
+    geminiService = new GeminiService(GEMINI_API_KEY);
+    console.log('✅ Gemini AI Service initialized successfully');
+  } catch (error) {
+    console.error('❌ Failed to initialize Gemini AI Service:', error.message);
+  }
+} else {
+  console.warn('⚠️  GEMINI_API_KEY not found - Gemini AI features will not work');
 }
 
 // Initialize TTS Service
@@ -87,14 +94,38 @@ if (process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
   }
 }
 
-// Option 2: File path from environment variable
+// Option 2: File path from environment variable (or JSON string if it looks like JSON)
 if (!credentialsPath && process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-  try {
-    fsSync.accessSync(process.env.GOOGLE_APPLICATION_CREDENTIALS);
-    credentialsPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
-    console.log(`📁 Found credentials from environment: ${credentialsPath}`);
-  } catch (error) {
-    console.warn(`⚠️  GOOGLE_APPLICATION_CREDENTIALS path not accessible: ${process.env.GOOGLE_APPLICATION_CREDENTIALS}`);
+  const credsValue = process.env.GOOGLE_APPLICATION_CREDENTIALS.trim();
+  
+  // Check if it's a JSON string (starts with {)
+  if (credsValue.startsWith('{')) {
+    try {
+      // Create temporary file from JSON string
+      const tempDir = os.tmpdir();
+      const tempCredsFile = path.join(tempDir, `gcp-creds-${Date.now()}.json`);
+      const credsJson = JSON.parse(credsValue);
+      
+      // Validate it's a service account
+      if (credsJson.type === 'service_account') {
+        fsSync.writeFileSync(tempCredsFile, credsValue);
+        credentialsPath = tempCredsFile;
+        console.log(`📁 Found credentials from GOOGLE_APPLICATION_CREDENTIALS (JSON string, temp file created)`);
+      } else {
+        console.warn(`⚠️  GOOGLE_APPLICATION_CREDENTIALS JSON is not a service account`);
+      }
+    } catch (error) {
+      console.warn(`⚠️  Failed to parse GOOGLE_APPLICATION_CREDENTIALS as JSON: ${error.message}`);
+    }
+  } else {
+    // It's a file path
+    try {
+      fsSync.accessSync(credsValue);
+      credentialsPath = credsValue;
+      console.log(`📁 Found credentials from environment: ${credentialsPath}`);
+    } catch (error) {
+      console.warn(`⚠️  GOOGLE_APPLICATION_CREDENTIALS path not accessible: ${credsValue}`);
+    }
   }
 }
 
