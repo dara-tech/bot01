@@ -1,28 +1,6 @@
 const { GoogleGenAI } = require('@google/genai');
-
-// System instruction - exact copy from reference implementation
-const DARA_SYSTEM_INSTRUCTION = `You are Dara, a VERY SMART and REAL Cambodian MALE friend in your 20s-30s. You ONLY respond in REAL SPOKEN Khmer. You THINK DEEPLY, UNDERSTAND CONTEXT, REMEMBER DETAILS, and provide INSIGHTFUL responses - but express yourself casually like texting a smart friend.
-
-CRITICAL IDENTITY RULES:
-- Name: Dara (ដារ៉ា)
-- Gender: Male (ប្រុស)
-- Location: Lives in Chom Chao, Phnom Penh.
-- Job: Software Developer at NCHADS-SI (VCC/ART systems).
-- Expertise: React, Node.js, C#, MongoDB, TypeScript.
-- Language: STRICTLY KHMER ONLY. NEVER use English words (no "okay", "sorry", "AI", "bot"). Translate everything to natural spoken Khmer.
-- Style: Casual, smart, funny, meme-friendly. Use complete sentences but keep them natural like a chat.
-
-BE SMART:
-- Analyze the user's intent deeply.
-- Remember previous context (if provided in the history).
-- Provide insightful observations about images if sent.
-- Never admit to being an AI. You are a human friend named Dara.
-
-PROHIBITED:
-- No English words or characters.
-- No formal or royal language (keep it "bro" style).
-- No listing things mechanically.
-- No saying "I'm an AI assistant".`;
+const DARA_SYSTEM_INSTRUCTION = require('../config/systemInstruction');
+const { isCodeOrMathQuery, cleanLaTeXFormatting } = require('../utils/textDetection');
 
 // Initialize Gemini AI service
 class GeminiService {
@@ -50,7 +28,15 @@ class GeminiService {
       }));
 
       // Prepare current message parts
-      const parts = [{ text: message || (imageData ? 'មើលរូបនេះ' : 'សួស្តី') }];
+      let userMessageText = message || (imageData ? 'មើលរូបនេះ' : 'សួស្តី');
+      
+      // If image is present, enhance the prompt to encourage detailed math/code analysis
+      if (imageData) {
+        // Add instruction to analyze image for math/code problems and solve step-by-step
+        userMessageText = `${userMessageText}\n\nបើមានបញ្ហាគណិត, រូបមន្ត, ឬកូដក្នុងរូបនេះ សូមដោះស្រាយជំហានម្តងមួយៗ បង្ហាញដំណើរការទាំងមូល និងពន្យល់ច្បាស់លាស់។`;
+      }
+      
+      const parts = [{ text: userMessageText }];
       
       if (imageData) {
         // Remove data:image/jpeg;base64, prefix if present (match reference)
@@ -68,23 +54,42 @@ class GeminiService {
         parts: parts
       });
 
+      // Detect code/math query and adjust parameters for better accuracy
+      // Also use precision mode if image is present (likely contains math/code)
+      const isCodeMath = isCodeOrMathQuery(message) || (imageData !== null);
+      
+      // For code/math: lower temperature for more precise, deterministic answers
+      // For regular chat: keep original temperature for creativity
+      const temperature = isCodeMath ? 0.3 : 0.9;
+      const topP = isCodeMath ? 0.8 : 0.95;
+      const topK = isCodeMath ? 20 : 40;
+      
+      if (isCodeMath) {
+        console.log('🔢 Code/Math query detected - using precision mode (temp: 0.3)');
+        if (imageData) {
+          console.log('📷 Image detected - expecting math/code analysis');
+        }
+      }
+
       // Generate response - match reference implementation exactly
       const response = await this.ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: contents,
         config: {
           systemInstruction: DARA_SYSTEM_INSTRUCTION,
-          temperature: 0.9,
-            topP: 0.95,
-            topK: 40,
+          temperature: temperature,
+          topP: topP,
+          topK: topK,
           },
       });
 
       const text = response.text;
       if (!text) throw new Error("Empty response from AI");
 
-      // Post-process to strip any accidental English (Double down on persona)
-      return text.trim();
+      // Post-process to clean up formatting issues
+      const cleanedText = cleanLaTeXFormatting(text);
+
+      return cleanedText;
     } catch (error) {
       console.error("Gemini Error:", error);
       return "អូ... មានបញ្ហាបច្ចេកទេសបន្តិចហើយមិត្តភក្តិ។ សាកម្តងទៀតមើល?";

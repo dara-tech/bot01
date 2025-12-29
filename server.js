@@ -2,8 +2,12 @@ require('dotenv').config();
 const express = require('express');
 const TelegramBot = require('node-telegram-bot-api');
 const GeminiService = require('./services/geminiService');
+const TTSService = require('./services/ttsService');
 const fetch = require('node-fetch');
 const cheerio = require('cheerio');
+const fs = require('fs').promises;
+const path = require('path');
+const os = require('os');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -49,8 +53,54 @@ if (GEMINI_API_KEY) {
   geminiService = new GeminiService(GEMINI_API_KEY);
 }
 
+// Initialize TTS Service
+// Use credentials file path from environment or check for service account file in current directory
+let ttsService = null;
+const fsSync = require('fs');
+
+// Priority order:
+// 1. GOOGLE_APPLICATION_CREDENTIALS from environment
+// 2. Service account file in current directory
+// 3. Old client secret file (will be detected as OAuth and use fallback)
+
+let credentialsPath = null;
+
+if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+  try {
+    fsSync.accessSync(process.env.GOOGLE_APPLICATION_CREDENTIALS);
+    credentialsPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+    console.log(`📁 Found credentials from environment: ${credentialsPath}`);
+  } catch (error) {
+    console.warn(`⚠️  GOOGLE_APPLICATION_CREDENTIALS path not accessible: ${process.env.GOOGLE_APPLICATION_CREDENTIALS}`);
+  }
+}
+
+// If no env path, try local service account file
+if (!credentialsPath) {
+  const localServiceAccount = path.join(__dirname, 'photoai-478919-1a91cfa646cd.json');
+  try {
+    fsSync.accessSync(localServiceAccount);
+    credentialsPath = localServiceAccount;
+    console.log(`📁 Found local service account file: ${localServiceAccount}`);
+  } catch (error) {
+    // File doesn't exist, continue to next option
+  }
+}
+
+// Initialize TTS service with found credentials or use fallback
+if (credentialsPath) {
+  ttsService = new TTSService(credentialsPath);
+  console.log(`✅ TTS Service initialized with credentials: ${credentialsPath}`);
+} else {
+  ttsService = new TTSService(); // Will use free fallback
+  console.warn('⚠️  TTS credentials file not found, using free TTS (female voice)');
+  console.warn('⚠️  To enable Google Cloud TTS, set GOOGLE_APPLICATION_CREDENTIALS in .env or place service account JSON in project root');
+}
+
 // Express middleware
 app.use(express.json());
+
+// TTS function removed - now using TTSService module
 
 // Function to extract URLs from message text
 function extractUrls(text, entities) {
@@ -349,10 +399,26 @@ bot.on('message', async (msg) => {
     cleanMessage.toLowerCase().includes(keyword.toLowerCase())
   );
 
+  // Check if user wants TTS (voice message)
+  const ttsKeywords = [
+    'សំឡេង', 'voice', 'TTS', 'ច្រៀង', 'បន្លឺ', 'សម្លេង',
+    'ជួយបន្លឺ', 'បន្លឺឲ្យ', 'say', 'speak', 'read'
+  ];
+  
+  const wantsTTS = cleanMessage && ttsKeywords.some(keyword => 
+    cleanMessage.toLowerCase().includes(keyword.toLowerCase())
+  );
+
   // មុខងាររក្សា typing indicator
   const keepTyping = async () => {
     try {
-      await bot.sendChatAction(chatId, wantsImageGen ? 'upload_photo' : 'typing');
+      if (wantsImageGen) {
+        await bot.sendChatAction(chatId, 'upload_photo');
+      } else if (wantsTTS) {
+        await bot.sendChatAction(chatId, 'record_voice');
+      } else {
+        await bot.sendChatAction(chatId, 'typing');
+      }
     } catch (error) {
       // មិនយក errors
     }
@@ -423,16 +489,52 @@ bot.on('message', async (msg) => {
       return;
     }
 
-    // Normal text response
+    // Generate response
     const response = await geminiService.generateKhmerMemeResponse(cleanMessage, chatId, imageBuffer);
     
     clearInterval(typingInterval);
     
-    if (response && response.trim().length > 0) {
-      await bot.sendMessage(chatId, response);
-    } else {
+    if (!response || response.trim().length === 0) {
       await bot.sendMessage(chatId, 'មានបញ្ហាក្នុងការបង្កើតចម្លើយ។ សូមព្យាយាមម្តងទៀត!');
+      return;
     }
+
+    // Send voice message if requested (no text caption)
+    if (wantsTTS) {
+      try {
+        if (!ttsService) {
+          throw new Error('TTS Service not initialized');
+        }
+
+        console.log('🎤 Converting text to speech...');
+        const tempFile = await ttsService.textToSpeechFile(
+          response, 
+          'en-US', 
+          'សំឡេងជាមិត្តភក្តិ',
+          os.tmpdir(),
+          `tts_${chatId}`
+        );
+        
+        // Send voice message only (no text caption)
+        await bot.sendVoice(chatId, tempFile);
+        
+        // Clean up temp file
+        await fs.unlink(tempFile).catch((err) => {
+          console.warn('⚠️  Could not delete temp file:', err.message);
+        });
+        
+        console.log('✅ Voice message sent successfully!');
+      } catch (ttsError) {
+        console.error('❌ TTS Error:', ttsError);
+        // Fallback to text message if TTS fails
+        await bot.sendMessage(chatId, response);
+        await bot.sendMessage(chatId, '⚠️ មិនអាចបន្លឺសំឡេងបាន ប៉ុន្តែបានផ្ញើជាអត្ថបទហើយ!');
+      }
+      return;
+    }
+
+    // Send normal text message
+    await bot.sendMessage(chatId, response);
   } catch (error) {
     clearInterval(typingInterval);
     console.error('កំហុស:', error);
@@ -457,7 +559,7 @@ bot.onText(/\/start/, async (msg) => {
 // ដោះស្រាយ /help command
 bot.onText(/\/help/, async (msg) => {
   const chatId = msg.chat.id;
-  const helpMessage = `📖 ជំនួយ:\n\n• ផ្ញើសារមកខ្ញុំ ហើយខ្ញុំនឹងឆ្លើយតបជាភាសាខ្មែរដោយប្រើប្រាស់រចនាប័ទ្ម meme!\n• ខ្ញុំប្រើប្រាស់ Gemini AI ដើម្បីបង្កើតចម្លើយ\n• ខ្ញុំអាចចងចាំការសន្ទនារបស់យើង!\n• 🎨 បង្កើតរូប: សរសេរ "បង្កើតរូប..." ឬ "គូររូប..." ដើម្បីបង្កើតរូបដោយ AI\n• ប្រើ /start ដើម្បីចាប់ផ្តើមការសន្ទនាថ្មី\n• គ្រាន់តែជជែកជាមួយខ្ញុំដូចជាមិត្តភក្តិ! 😊`;
+  const helpMessage = `📖 ជំនួយ:\n\n• ផ្ញើសារមកខ្ញុំ ហើយខ្ញុំនឹងឆ្លើយតបជាភាសាខ្មែរដោយប្រើប្រាស់រចនាប័ទ្ម meme!\n• ខ្ញុំប្រើប្រាស់ Gemini AI ដើម្បីបង្កើតចម្លើយ\n• ខ្ញុំអាចចងចាំការសន្ទនារបស់យើង!\n• 🎨 បង្កើតរូប: សរសេរ "បង្កើតរូប..." ឬ "គូររូប..." ដើម្បីបង្កើតរូបដោយ AI\n• 🎤 សំឡេង: សរសេរ "សំឡេង" ឬ "បន្លឺ" ក្នុងសារ ដើម្បីឱ្យខ្ញុំឆ្លើយជាសំឡេង\n• ប្រើ /start ដើម្បីចាប់ផ្តើមការសន្ទនាថ្មី\n• គ្រាន់តែជជែកជាមួយខ្ញុំដូចជាមិត្តភក្តិ! 😊`;
   await bot.sendMessage(chatId, helpMessage);
 });
 
