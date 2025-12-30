@@ -132,7 +132,7 @@ class TTSService {
       ];
 
       // Gemini voices (Rasalgethi is a good male voice)
-      const geminiVoices = ['Fenrir'];
+      const geminiVoices = ['Dipper'];
 
       for (const model of geminiModels) {
         for (const speaker of geminiVoices) {
