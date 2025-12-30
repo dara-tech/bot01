@@ -10,7 +10,49 @@ class GeminiService {
     }
     this.ai = new GoogleGenAI({ apiKey: apiKey });
     this.conversationHistory = new Map(); // Store conversation history per chat
+    this.conversationTimestamps = new Map(); // Track last access time for cleanup
+    this.maxHistorySize = parseInt(process.env.MAX_CONVERSATION_HISTORY) || 20; // Reduced from 40 to 20
+    this.maxConversations = parseInt(process.env.MAX_CONVERSATIONS) || 100; // Limit active conversations
+    this.conversationTTL = parseInt(process.env.CONVERSATION_TTL) || 3600000; // 1 hour
+    
+    // Cleanup old conversations every 30 minutes
+    setInterval(() => this.cleanupOldConversations(), 30 * 60 * 1000);
+    
     console.log('✅ Google AI Studio initialized');
+  }
+
+  // Cleanup old conversations to free memory
+  cleanupOldConversations() {
+    const now = Date.now();
+    let cleaned = 0;
+    
+    for (const [chatId, timestamp] of this.conversationTimestamps.entries()) {
+      if (now - timestamp > this.conversationTTL) {
+        this.conversationHistory.delete(chatId);
+        this.conversationTimestamps.delete(chatId);
+        cleaned++;
+      }
+    }
+    
+    // If still too many conversations, remove oldest
+    if (this.conversationHistory.size > this.maxConversations) {
+      const sorted = Array.from(this.conversationTimestamps.entries())
+        .sort((a, b) => a[1] - b[1]);
+      
+      const toRemove = this.conversationHistory.size - this.maxConversations;
+      for (let i = 0; i < toRemove; i++) {
+        const chatId = sorted[i][0];
+        this.conversationHistory.delete(chatId);
+        this.conversationTimestamps.delete(chatId);
+        cleaned++;
+      }
+    }
+    
+    if (cleaned > 0) {
+      console.log(`🧹 Cleaned up ${cleaned} old conversations. Active: ${this.conversationHistory.size}`);
+      // Force garbage collection hint
+      if (global.gc) global.gc();
+    }
   }
 
   // Convert image buffer to base64 for Gemini
@@ -122,13 +164,18 @@ class GeminiService {
         text: response
       });
 
-      // Keep only last 20 messages (40 items = 20 user + 20 model) to avoid token limits
-      if (conversationHistory.length > 40) {
-        conversationHistory = conversationHistory.slice(-40);
+      // Keep only last N messages (reduced for memory efficiency)
+      if (conversationHistory.length > this.maxHistorySize) {
+        conversationHistory = conversationHistory.slice(-this.maxHistorySize);
       }
 
       this.conversationHistory.set(chatId, conversationHistory);
-      console.log(`💾 រក្សាការសន្ទនាសម្រាប់ chat ${chatId} (${response.length} chars)`);
+      this.conversationTimestamps.set(chatId, Date.now());
+      
+      // Only log in development
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`💾 រក្សាការសន្ទនាសម្រាប់ chat ${chatId}`);
+      }
       
       return response;
     } catch (error) {

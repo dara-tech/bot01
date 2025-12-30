@@ -12,6 +12,60 @@ const os = require('os');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Performance optimizations for limited resources
+const MAX_CONCURRENT_REQUESTS = parseInt(process.env.MAX_CONCURRENT_REQUESTS) || 10;
+const RATE_LIMIT_PER_USER = parseInt(process.env.RATE_LIMIT_PER_USER) || 5; // requests per minute
+const MAX_IMAGE_SIZE = parseInt(process.env.MAX_IMAGE_SIZE) || 2 * 1024 * 1024; // 2MB
+
+// Request queue and rate limiting
+let activeRequests = 0;
+const requestQueue = [];
+const userRequestCounts = new Map();
+
+// Rate limiting cleanup
+setInterval(() => {
+  userRequestCounts.clear();
+}, 60000); // Reset every minute
+
+// Process request queue
+async function processQueue() {
+  if (requestQueue.length === 0 || activeRequests >= MAX_CONCURRENT_REQUESTS) {
+    return;
+  }
+  
+  const { handler, resolve, reject } = requestQueue.shift();
+  activeRequests++;
+  
+  try {
+    await handler();
+    resolve();
+  } catch (error) {
+    reject(error);
+  } finally {
+    activeRequests--;
+    processQueue(); // Process next in queue
+  }
+}
+
+// Rate limiting middleware
+function rateLimitMiddleware(chatId) {
+  const now = Date.now();
+  const userRequests = userRequestCounts.get(chatId) || { count: 0, resetTime: now + 60000 };
+  
+  if (now > userRequests.resetTime) {
+    userRequests.count = 0;
+    userRequests.resetTime = now + 60000;
+  }
+  
+  if (userRequests.count >= RATE_LIMIT_PER_USER) {
+    return false; // Rate limited
+  }
+  
+  userRequests.count++;
+  userRequestCounts.set(chatId, userRequests);
+  return true;
+}
+
 // Telegram Bot Token
 const TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 if (!TELEGRAM_TOKEN) {
@@ -51,7 +105,7 @@ bot.getMe().then((me) => {
 let geminiService = null;
 if (GEMINI_API_KEY) {
   try {
-    geminiService = new GeminiService(GEMINI_API_KEY);
+  geminiService = new GeminiService(GEMINI_API_KEY);
     console.log('✅ Gemini AI Service initialized successfully');
   } catch (error) {
     console.error('❌ Failed to initialize Gemini AI Service:', error.message);
@@ -113,7 +167,7 @@ if (!credentialsPath && process.env.GOOGLE_APPLICATION_CREDENTIALS) {
         console.log(`📁 Found credentials from GOOGLE_APPLICATION_CREDENTIALS (JSON string, temp file created)`);
       } else {
         console.warn(`⚠️  GOOGLE_APPLICATION_CREDENTIALS JSON is not a service account`);
-      }
+  }
     } catch (error) {
       console.warn(`⚠️  Failed to parse GOOGLE_APPLICATION_CREDENTIALS as JSON: ${error.message}`);
     }
@@ -277,6 +331,26 @@ function keepAlive() {
 // Set up keep-alive ping every 12 minutes (720000 ms)
 setInterval(keepAlive, 12 * 60 * 1000);
 
+// Memory monitoring (every 5 minutes)
+if (process.env.NODE_ENV !== 'production') {
+  setInterval(() => {
+    const memUsage = process.memoryUsage();
+    const memMB = {
+      rss: Math.round(memUsage.rss / 1024 / 1024),
+      heapUsed: Math.round(memUsage.heapUsed / 1024 / 1024),
+      heapTotal: Math.round(memUsage.heapTotal / 1024 / 1024),
+      external: Math.round(memUsage.external / 1024 / 1024)
+    };
+    
+    if (memMB.heapUsed > 400) { // Warn if using more than 400MB
+      console.warn(`⚠️  High memory usage: ${memMB.heapUsed}MB / ${memMB.heapTotal}MB`);
+      if (global.gc) global.gc(); // Force GC if available
+    } else {
+      console.log(`💾 Memory: ${memMB.heapUsed}MB / ${memMB.heapTotal}MB | Active conversations: ${geminiService?.conversationHistory?.size || 0}`);
+    }
+  }, 5 * 60 * 1000);
+}
+
 // ដោះស្រាយ Telegram messages
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
@@ -289,8 +363,16 @@ bot.on('message', async (msg) => {
     return;
   }
   
-  console.log(`📨 ទទួលសារពី chat ID: ${chatId}, ប្រភេទ: ${chatType}`);
-  console.log(`💬 សារ: ${userMessage ? userMessage.substring(0, 50) : 'សារមិនមែនអត្ថបទ'}`);
+  // Rate limiting check
+  if (!rateLimitMiddleware(chatId)) {
+    await bot.sendMessage(chatId, '⚠️ សូមរង់ចាំបន្តិច... ខ្ញុំកំពុងដំណើរការសារផ្សេងទៀត។');
+    return;
+  }
+
+  // Only log in development
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(`📨 ទទួលសារពី chat ID: ${chatId}, ប្រភេទ: ${chatType}`);
+  }
 
   // ពិនិត្យថាតើ bot ត្រូវបាន mention នៅក្នុង group/supergroup
   let isMentioned = false;
@@ -343,40 +425,71 @@ bot.on('message', async (msg) => {
     return;
   }
 
-  // Handle photos/images
+  // Handle photos/images with size limits
   let imageBuffer = null;
   if (msg.photo && msg.photo.length > 0) {
     try {
       // Get the largest photo
       const photo = msg.photo[msg.photo.length - 1];
+      
+      // Check file size before downloading
+      if (photo.file_size && photo.file_size > MAX_IMAGE_SIZE) {
+        await bot.sendMessage(chatId, `⚠️ រូបភាពធំពេក (${Math.round(photo.file_size / 1024 / 1024)}MB). សូមបញ្ជូនរូបតូចជាង 2MB។`);
+        return;
+      }
+      
       const fileId = photo.file_id;
       const file = await bot.getFile(fileId);
       const fileStream = await bot.getFileStream(fileId);
       
-      // Convert stream to buffer
+      // Convert stream to buffer with size limit
       const chunks = [];
+      let totalSize = 0;
       for await (const chunk of fileStream) {
+        totalSize += chunk.length;
+        if (totalSize > MAX_IMAGE_SIZE) {
+          await bot.sendMessage(chatId, '⚠️ រូបភាពធំពេក។ សូមបញ្ជូនរូបតូចជាង 2MB។');
+          return;
+        }
         chunks.push(chunk);
       }
       imageBuffer = Buffer.concat(chunks);
-      console.log(`📷 ទទួលរូបភាព: ${file.file_path}`);
+      
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`📷 ទទួលរូបភាព: ${file.file_path} (${imageBuffer.length} bytes)`);
+      }
     } catch (error) {
       console.error('កំហុសក្នុងការទាញយករូបភាព:', error);
     }
   }
 
-  // Handle documents (images sent as files)
+  // Handle documents (images sent as files) with size limits
   if (msg.document && msg.document.mime_type && msg.document.mime_type.startsWith('image/')) {
     try {
+      // Check file size before downloading
+      if (msg.document.file_size && msg.document.file_size > MAX_IMAGE_SIZE) {
+        await bot.sendMessage(chatId, `⚠️ ឯកសារធំពេក (${Math.round(msg.document.file_size / 1024 / 1024)}MB). សូមបញ្ជូនឯកសារតូចជាង 2MB។`);
+        return;
+      }
+      
       const fileId = msg.document.file_id;
       const fileStream = await bot.getFileStream(fileId);
       
       const chunks = [];
+      let totalSize = 0;
       for await (const chunk of fileStream) {
+        totalSize += chunk.length;
+        if (totalSize > MAX_IMAGE_SIZE) {
+          await bot.sendMessage(chatId, '⚠️ ឯកសារធំពេក។ សូមបញ្ជូនឯកសារតូចជាង 2MB។');
+          return;
+        }
         chunks.push(chunk);
       }
       imageBuffer = Buffer.concat(chunks);
-      console.log(`📷 ទទួលរូបភាពជាឯកសារ: ${msg.document.file_name}`);
+      
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`📷 ទទួលរូបភាពជាឯកសារ: ${msg.document.file_name}`);
+      }
     } catch (error) {
       console.error('កំហុសក្នុងការទាញយកឯកសាររូបភាព:', error);
     }
@@ -481,6 +594,26 @@ bot.on('message', async (msg) => {
   await keepTyping();
   const typingInterval = setInterval(keepTyping, 3000);
 
+  // Wrap in queue system for concurrent request limiting
+  await new Promise((resolve, reject) => {
+    requestQueue.push({
+      handler: async () => {
+        try {
+          await processMessage();
+          resolve();
+        } catch (error) {
+          reject(error);
+        } finally {
+          clearInterval(typingInterval);
+        }
+      },
+      resolve,
+      reject
+    });
+    processQueue();
+  });
+
+  async function processMessage() {
   try {
     if (!geminiService) {
       await bot.sendMessage(chatId, 'សូមដំឡើង GEMINI_API_KEY ក្នុង .env file!');
@@ -554,13 +687,13 @@ bot.on('message', async (msg) => {
     }
 
     // Send voice message if requested (no text caption)
-    if (wantsTTS) {
-      try {
-        if (!ttsService) {
-          throw new Error('TTS Service not initialized');
-        }
+      if (wantsTTS) {
+        try {
+          if (!ttsService) {
+            throw new Error('TTS Service not initialized');
+          }
 
-        console.log('🎤 Converting text to speech...');
+          console.log('🎤 Converting text to speech...');
         const tempFile = await ttsService.textToSpeechFile(
           response, 
           'en-US', 
@@ -568,35 +701,35 @@ bot.on('message', async (msg) => {
           os.tmpdir(),
           `tts_${chatId}`
         );
-        
+          
         // Send voice message only (no text caption)
         await bot.sendVoice(chatId, tempFile);
+          
+          // Clean up temp file
+          await fs.unlink(tempFile).catch((err) => {
+            console.warn('⚠️  Could not delete temp file:', err.message);
+          });
         
-        // Clean up temp file
-        await fs.unlink(tempFile).catch((err) => {
-          console.warn('⚠️  Could not delete temp file:', err.message);
-        });
-        
-        console.log('✅ Voice message sent successfully!');
-      } catch (ttsError) {
-        console.error('❌ TTS Error:', ttsError);
-        // Fallback to text message if TTS fails
-        await bot.sendMessage(chatId, response);
-        await bot.sendMessage(chatId, '⚠️ មិនអាចបន្លឺសំឡេងបាន ប៉ុន្តែបានផ្ញើជាអត្ថបទហើយ!');
-      }
+          console.log('✅ Voice message sent successfully!');
+        } catch (ttsError) {
+          console.error('❌ TTS Error:', ttsError);
+          // Fallback to text message if TTS fails
+          await bot.sendMessage(chatId, response);
+          await bot.sendMessage(chatId, '⚠️ មិនអាចបន្លឺសំឡេងបាន ប៉ុន្តែបានផ្ញើជាអត្ថបទហើយ!');
+        }
       return;
     }
 
     // Send normal text message
     await bot.sendMessage(chatId, response);
   } catch (error) {
-    clearInterval(typingInterval);
     console.error('កំហុស:', error);
     try {
       await bot.sendMessage(chatId, 'មានបញ្ហាក្នុងការដំណើរការ។ សូមព្យាយាមម្តងទៀត!');
     } catch (sendError) {
       console.error('មិនអាចផ្ញើសារកំហុស:', sendError);
     }
+  }
   }
 });
 
