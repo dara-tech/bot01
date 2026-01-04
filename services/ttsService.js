@@ -104,6 +104,122 @@ class TTSService {
   }
 
   /**
+   * Detect emotion from text and generate appropriate style prompt
+   * @param {string} text - The text to analyze
+   * @returns {string} Style prompt based on detected emotion
+   */
+  detectEmotionAndGenerateStylePrompt(text) {
+    if (!text) return null;
+
+    const lowerText = text.toLowerCase();
+    const textLength = text.length;
+
+    // Emotion patterns (English and Khmer)
+    const emotionPatterns = {
+      // Happy/Excited
+      happy: {
+        patterns: [
+          /(?:happy|joy|excited|great|wonderful|awesome|amazing|fantastic|excellent|yay|hooray|😄|😊|😃|🎉|🎊)/i,
+          /(?:សប្បាយ|រីករាយ|រីករាយណាស់|អស្ចារ្យ|ល្អណាស់|អឺ|យ៉ាស់)/i,
+          /(?:!{2,}|\?{2,})/ // Multiple exclamation/question marks
+        ],
+        stylePrompt: "Say this in a happy, cheerful, and enthusiastic way with a warm, friendly tone"
+      },
+      // Sad/Disappointed
+      sad: {
+        patterns: [
+          /(?:sad|sorry|disappointed|unfortunate|unfortunately|sadly|😢|😭|😞|💔)/i,
+          /(?:សោកស្តាយ|អាម៉ាស់|អាក្រក់|អាប់រិម|អាប់ចិត្ត|ខកចិត្ត)/i
+        ],
+        stylePrompt: "Say this in a gentle, empathetic, and slightly somber tone with compassion"
+      },
+      // Angry/Frustrated
+      angry: {
+        patterns: [
+          /(?:angry|mad|furious|annoyed|frustrated|upset|😠|😡|🤬|💢)/i,
+          /(?:ខឹង|ខឹងណាស់|អាក្រក់|អាក្រក់ណាស់|មិនពេញចិត្ត)/i
+        ],
+        stylePrompt: "Say this with a firm, serious tone but remain professional and controlled"
+      },
+      // Surprised/Shocked
+      surprised: {
+        patterns: [
+          /(?:wow|surprised|shocked|unbelievable|incredible|really\?|😲|😮|🤯|😱)/i,
+          /(?:អូ|អូណា|មែនទេ|មិនជឿ|អស្ចារ្យ|អឺ)/i
+        ],
+        stylePrompt: "Say this with surprise and wonder, expressing amazement and curiosity"
+      },
+      // Questioning/Curious
+      curious: {
+        patterns: [
+          /(?:what|why|how|when|where|who|which|really\?|hmm|🤔|❓)/i,
+          /(?:អ្វី|ហេតុអ្វី|យ៉ាងណា|ពេលណា|នៅឯណា|អ្នកណា|មែនទេ|អឺ)/i,
+          /\?/ // Question mark
+        ],
+        stylePrompt: "Say this in a curious, inquisitive way with a questioning, thoughtful tone"
+      },
+      // Friendly/Warm
+      friendly: {
+        patterns: [
+          /(?:hello|hi|hey|thanks|thank you|please|welcome|😊|🙂|👋)/i,
+          /(?:សួស្តី|ជំរាបសួរ|សូមអរគុណ|អរគុណ|សូម|សូមជួយ|ជំរាបលា)/i
+        ],
+        stylePrompt: "Say this in a warm, friendly, and welcoming way with a genuine, kind tone"
+      },
+      // Apologetic
+      apologetic: {
+        patterns: [
+          /(?:sorry|apologize|apology|my bad|oops|😅|🙏)/i,
+          /(?:សុំទោស|សូមទោស|អាម៉ាស់|មិនអីទេ)/i
+        ],
+        stylePrompt: "Say this in a sincere, apologetic way with humility and regret"
+      },
+      // Encouraging/Supportive
+      encouraging: {
+        patterns: [
+          /(?:good|great job|well done|keep going|you can do it|💪|👍|👏)/i,
+          /(?:ល្អ|ល្អណាស់|អស្ចារ្យ|ចូរបន្ត|អាចធ្វើបាន|ជោគជ័យ)/i
+        ],
+        stylePrompt: "Say this in an encouraging, supportive, and motivating way with positive energy"
+      },
+      // Neutral/Informative (default)
+      neutral: {
+        patterns: [],
+        stylePrompt: "Say this in a clear, natural, and conversational way"
+      }
+    };
+
+    // Score each emotion based on pattern matches
+    const emotionScores = {};
+    for (const [emotion, config] of Object.entries(emotionPatterns)) {
+      let score = 0;
+      for (const pattern of config.patterns) {
+        const matches = text.match(pattern);
+        if (matches) {
+          score += matches.length;
+          // Boost score for multiple exclamation/question marks
+          if (pattern.source.includes('!') || pattern.source.includes('?')) {
+            score += matches[0].length - 1;
+          }
+        }
+      }
+      emotionScores[emotion] = score;
+    }
+
+    // Find the emotion with highest score
+    const detectedEmotion = Object.keys(emotionScores).reduce((a, b) => 
+      emotionScores[a] > emotionScores[b] ? a : b
+    );
+
+    // Only return style prompt if emotion was detected (score > 0) or if it's neutral
+    if (emotionScores[detectedEmotion] > 0 || detectedEmotion === 'neutral') {
+      return emotionPatterns[detectedEmotion].stylePrompt;
+    }
+
+    return null;
+  }
+
+  /**
    * Main TTS function
    * @param {string} text - The text to speak
    * @param {string} language - Language code (e.g., 'en-US', 'km-KH'). Default 'en-US'
@@ -117,6 +233,14 @@ class TTSService {
     // Limit text length for performance
     const textToConvert = text.substring(0, 5000); // Gemini TTS supports longer text
     const startTime = Date.now();
+
+    // Auto-detect emotion and generate style prompt if not provided
+    if (!stylePrompt) {
+      stylePrompt = this.detectEmotionAndGenerateStylePrompt(textToConvert);
+      if (stylePrompt && process.env.NODE_ENV !== 'production') {
+        console.log(`🎭 Detected emotion style: ${stylePrompt.substring(0, 60)}...`);
+      }
+    }
 
     // Extract language code (e.g., 'km' from 'km-KH')
     const languageCode = language.split('-')[0];

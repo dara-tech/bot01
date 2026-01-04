@@ -1,6 +1,6 @@
 const { GoogleGenAI } = require('@google/genai');
 const DARA_SYSTEM_INSTRUCTION = require('../config/systemInstruction');
-const { isCodeOrMathQuery, cleanLaTeXFormatting } = require('../utils/textDetection');
+const { cleanLaTeXFormatting } = require('../utils/textDetection');
 
 // Initialize Gemini AI service
 class GeminiService {
@@ -72,12 +72,6 @@ class GeminiService {
       // Prepare current message parts
       let userMessageText = message || (imageData ? 'មើលរូបនេះ' : 'សួស្តី');
       
-      // If image is present, enhance the prompt to encourage detailed math/code analysis
-      if (imageData) {
-        // Add instruction to analyze image for math/code problems and solve step-by-step
-        userMessageText = `${userMessageText}\n\nបើមានបញ្ហាគណិត, រូបមន្ត, ឬកូដក្នុងរូបនេះ សូមដោះស្រាយជំហានម្តងមួយៗ បង្ហាញដំណើរការទាំងមូល និងពន្យល់ច្បាស់លាស់។`;
-      }
-      
       const parts = [{ text: userMessageText }];
       
       if (imageData) {
@@ -96,24 +90,13 @@ class GeminiService {
         parts: parts
       });
 
-      // Detect code/math query and adjust parameters for better accuracy
-      // Also use precision mode if image is present (likely contains math/code)
-      const isCodeMath = isCodeOrMathQuery(message) || (imageData !== null);
-      
-      // For code/math: lower temperature for more precise, deterministic answers
-      // For regular chat: keep original temperature for creativity
-      const temperature = isCodeMath ? 0.3 : 0.9;
-      const topP = isCodeMath ? 0.8 : 0.95;
-      const topK = isCodeMath ? 20 : 40;
-      
-      if (isCodeMath) {
-        console.log('🔢 Code/Math query detected - using precision mode (temp: 0.3)');
-        if (imageData) {
-          console.log('📷 Image detected - expecting math/code analysis');
-        }
-      }
+      // Use natural, human-like parameters for all conversations
+      // Keeping creative and genuine responses
+      const temperature = 0.9;
+      const topP = 0.95;
+      const topK = 40;
 
-      // Generate response - match reference implementation exactly
+      // Generate response with natural, human-like parameters
       const response = await this.ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: contents,
