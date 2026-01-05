@@ -277,9 +277,11 @@ class GeminiService {
             
             if (part.text) {
               // Check if text contains function call format - this is wrong, reject it
-              if (part.text.includes('"action"') || part.text.includes('dalle.text2im') || part.text.includes('functionCall')) {
+              // Look for JSON structures that look like function calls
+              if (part.text.includes('"action"') && part.text.includes('"action_input"')) {
                 console.error(`❌ Model returned function call format instead of image!`);
-                throw new Error('Model returned function call instead of generating image. Please try again.');
+                console.error(`❌ Text content: ${part.text.substring(0, 300)}...`);
+                throw new Error('Model returned function call format instead of generating image. Please try again.');
               }
               console.log(`⚠️ Part ${i} contains text (${part.text.length} chars): ${part.text.substring(0, 200)}...`);
             }
