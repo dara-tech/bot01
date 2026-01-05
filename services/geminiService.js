@@ -200,8 +200,9 @@ class GeminiService {
       
       console.log(`🎨 Image prompt: ${prompt.substring(0, 80)}...`);
       
-      // Use gemini-3-flash-preview for image generation
+      // Use gemini-2.5-flash-image for image generation
       // IMPORTANT: Disable function calling to prevent tool call outputs
+      // Safety settings: Allow NSFW content by setting all harm categories to BLOCK_NONE
       const response = await this.ai.models.generateContent({
         model: 'gemini-2.5-flash-image',
         contents: [{
@@ -212,7 +213,26 @@ class GeminiService {
           systemInstruction: DARA_SYSTEM_INSTRUCTION + '\n\nCRITICAL: When creating images, generate them directly. NEVER output JSON, function calls, tool formats, or {"action": ...} syntax. Just generate the image naturally.',
           temperature: 0.7,
           // Disable function calling
-          tools: []
+          tools: [],
+          // Safety settings: Allow NSFW content
+          safetySettings: [
+            {
+              category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
+              threshold: 'BLOCK_NONE'
+            },
+            {
+              category: 'HARM_CATEGORY_HATE_SPEECH',
+              threshold: 'BLOCK_NONE'
+            },
+            {
+              category: 'HARM_CATEGORY_HARASSMENT',
+              threshold: 'BLOCK_NONE'
+            },
+            {
+              category: 'HARM_CATEGORY_DANGEROUS_CONTENT',
+              threshold: 'BLOCK_NONE'
+            }
+          ]
         }
       });
 
