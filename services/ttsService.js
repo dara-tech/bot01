@@ -255,8 +255,8 @@ class TTSService {
         'gemini-2.5-pro-tts',
       ];
 
-      // Gemini voices (Rasalgethi is a good male voice)
-      const geminiVoices = ['Rasalgethi'];
+      // Gemini voices (Aoede is a good female voice, Callirrhoe is also great)
+      const geminiVoices = ['Aoede', 'Callirrhoe'];
 
       for (const model of geminiModels) {
         for (const speaker of geminiVoices) {

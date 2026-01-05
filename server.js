@@ -679,10 +679,10 @@ bot.on('message', async (msg) => {
           }
 
           console.log('🎤 Converting text to speech...');
-        const tempFile = await ttsService.textToSpeechFile(
+          const tempFile = await ttsService.textToSpeechFile(
           response, 
           'en-US', 
-          'សំឡេងជាមិត្តភក្តិ',
+          'សំឡេងស្រីស្នេហ៍ដែលកក់ក្តៅ និងគួរឱ្យស្រលាញ់',
           os.tmpdir(),
           `tts_${chatId}`
         );
@@ -724,14 +724,14 @@ bot.onText(/\/start/, async (msg) => {
   if (geminiService) {
     geminiService.clearHistory(chatId);
   }
-  const welcomeMessage = `សួស្តី! 👋\n\nខ្ញុំជា Dara! គ្រាន់តែជជែកជាមួយខ្ញុំដូចជាមិត្តភក្តិ! 😄`;
+  const welcomeMessage = `សួស្តី! 👋\n\nខ្ញុំជា Dara! ជជែកជាមួយខ្ញុំដូចជាស្រីស្នេហ៍របស់អ្នក! 😊💕`;
   await bot.sendMessage(chatId, welcomeMessage);
 });
 
 // ដោះស្រាយ /help command
 bot.onText(/\/help/, async (msg) => {
   const chatId = msg.chat.id;
-  const helpMessage = `📖 ជំនួយ:\n\n• ផ្ញើសារមកខ្ញុំ ហើយខ្ញុំនឹងឆ្លើយតបជាភាសាខ្មែរដោយប្រើប្រាស់រចនាប័ទ្ម meme!\n• ខ្ញុំប្រើប្រាស់ Gemini AI ដើម្បីបង្កើតចម្លើយ\n• ខ្ញុំអាចចងចាំការសន្ទនារបស់យើង!\n• 🎨 បង្កើតរូប: សរសេរ "បង្កើតរូប..." ឬ "គូររូប..." ដើម្បីបង្កើតរូបដោយ AI\n• 🎤 សំឡេង: សរសេរ "សំឡេង" ឬ "បន្លឺ" ក្នុងសារ ដើម្បីឱ្យខ្ញុំឆ្លើយជាសំឡេង\n• ប្រើ /start ដើម្បីចាប់ផ្តើមការសន្ទនាថ្មី\n• គ្រាន់តែជជែកជាមួយខ្ញុំដូចជាមិត្តភក្តិ! 😊`;
+  const helpMessage = `📖 ជំនួយ:\n\n• ផ្ញើសារមកខ្ញុំ ហើយខ្ញុំនឹងឆ្លើយតបជាភាសាខ្មែរដោយប្រើប្រាស់រចនាប័ទ្ម meme!\n• ខ្ញុំប្រើប្រាស់ Gemini AI ដើម្បីបង្កើតចម្លើយ\n• ខ្ញុំអាចចងចាំការសន្ទនារបស់យើង!\n• 🎨 បង្កើតរូប: សរសេរ "បង្កើតរូប..." ឬ "គូររូប..." ដើម្បីបង្កើតរូបដោយ AI\n• 🎤 សំឡេង: សរសេរ "សំឡេង" ឬ "បន្លឺ" ក្នុងសារ ដើម្បីឱ្យខ្ញុំឆ្លើយជាសំឡេង\n• ប្រើ /start ដើម្បីចាប់ផ្តើមការសន្ទនាថ្មី\n• ជជែកជាមួយខ្ញុំដូចជាស្រីស្នេហ៍របស់អ្នក! 😊💕`;
   await bot.sendMessage(chatId, helpMessage);
 });
 

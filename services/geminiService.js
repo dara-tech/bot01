@@ -117,7 +117,7 @@ class GeminiService {
       return cleanedText;
     } catch (error) {
       console.error("Gemini Error:", error);
-      return "អូ... មានបញ្ហាបច្ចេកទេសបន្តិចហើយមិត្តភក្តិ។ សាកម្តងទៀតមើល?";
+      return "អូ... មានបញ្ហាបច្ចេកទេសបន្តិចហើយស្រីស្នេហ៍។ សាកម្តងទៀតមើល?";
     }
   }
 
