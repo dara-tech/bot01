@@ -203,7 +203,7 @@ class GeminiService {
       // Use gemini-3-flash-preview for image generation
       // IMPORTANT: Disable function calling to prevent tool call outputs
       const response = await this.ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: 'gemini-2.5-flash-image',
         contents: [{
           role: 'user',
           parts: [{ text: contextualPrompt }]
