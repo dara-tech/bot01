@@ -116,14 +116,14 @@ class TTSService {
 
     // Emotion patterns (English and Khmer)
     const emotionPatterns = {
-      // Happy/Excited
+      // Happy/Excited (younger, bubbly)
       happy: {
         patterns: [
           /(?:happy|joy|excited|great|wonderful|awesome|amazing|fantastic|excellent|yay|hooray|😄|😊|😃|🎉|🎊)/i,
           /(?:សប្បាយ|រីករាយ|រីករាយណាស់|អស្ចារ្យ|ល្អណាស់|អឺ|យ៉ាស់)/i,
           /(?:!{2,}|\?{2,})/ // Multiple exclamation/question marks
         ],
-        stylePrompt: "Say this in a happy, cheerful, and enthusiastic way with a warm, friendly tone"
+        stylePrompt: "Say this in a happy, cheerful, youthful, and bubbly way with bright energy like an excited young girlfriend"
       },
       // Sad/Disappointed
       sad: {
@@ -158,13 +158,13 @@ class TTSService {
         ],
         stylePrompt: "Say this in a curious, inquisitive way with a questioning, thoughtful tone"
       },
-      // Friendly/Warm
+      // Friendly/Warm (younger, energetic girlfriend)
       friendly: {
         patterns: [
           /(?:hello|hi|hey|thanks|thank you|please|welcome|😊|🙂|👋)/i,
           /(?:សួស្តី|ជំរាបសួរ|សូមអរគុណ|អរគុណ|សូម|សូមជួយ|ជំរាបលា)/i
         ],
-        stylePrompt: "Say this in a warm, friendly, and welcoming way with a genuine, kind tone"
+        stylePrompt: "Say this in a warm, friendly, youthful, and energetic way like a young girlfriend with a bright, cheerful tone"
       },
       // Apologetic
       apologetic: {
@@ -182,10 +182,10 @@ class TTSService {
         ],
         stylePrompt: "Say this in an encouraging, supportive, and motivating way with positive energy"
       },
-      // Neutral/Informative (default)
+      // Neutral/Informative (default - younger girlfriend tone)
       neutral: {
         patterns: [],
-        stylePrompt: "Say this in a clear, natural, and conversational way"
+        stylePrompt: "Say this in a clear, natural, youthful, and conversational way like a young girlfriend chatting casually"
       }
     };
 
@@ -255,8 +255,11 @@ class TTSService {
         'gemini-2.5-pro-tts',
       ];
 
-      // Gemini voices (Aoede is a good female voice, Callirrhoe is also great)
-      const geminiVoices = ['Aoede', 'Callirrhoe'];
+      // Gemini voices - younger-sounding female voices (try in order)
+      // Leda: youthful and energetic female voice
+      // Aoede: good female voice
+      // Callirrhoe: also great female voice
+      const geminiVoices = ['Leda', 'Aoede', 'Callirrhoe'];
 
       for (const model of geminiModels) {
         for (const speaker of geminiVoices) {
