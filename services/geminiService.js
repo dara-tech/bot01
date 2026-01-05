@@ -200,11 +200,20 @@ class GeminiService {
       
       console.log(`🎨 Image prompt: ${prompt.substring(0, 80)}...`);
       
-      // Use gemini-2.5-flash-image model for native Gemini image generation
-      // Contents should be a string directly - Gemini will generate image natively
+      // Use gemini-3-flash-preview for image generation
+      // IMPORTANT: Disable function calling to prevent tool call outputs
       const response = await this.ai.models.generateContent({
-        model: 'gemini-2.5-flash-image',
-        contents: contextualPrompt, // Pass context-aware prompt
+        model: 'gemini-3-flash-preview',
+        contents: [{
+          role: 'user',
+          parts: [{ text: contextualPrompt }]
+        }],
+        config: {
+          systemInstruction: DARA_SYSTEM_INSTRUCTION + '\n\nCRITICAL: When creating images, generate them directly. NEVER output JSON, function calls, tool formats, or {"action": ...} syntax. Just generate the image naturally.',
+          temperature: 0.7,
+          // Disable function calling
+          tools: []
+        }
       });
 
       // Extract image data from response
@@ -262,16 +271,22 @@ class GeminiService {
             }
           }
           
-          // Log any text parts for debugging (but only log, don't treat as function calls)
+          // Check for text parts that might contain function calls (should not happen)
           for (let i = 0; i < candidate.content.parts.length; i++) {
             const part = candidate.content.parts[i];
             
             if (part.text) {
+              // Check if text contains function call format - this is wrong, reject it
+              if (part.text.includes('"action"') || part.text.includes('dalle.text2im') || part.text.includes('functionCall')) {
+                console.error(`❌ Model returned function call format instead of image!`);
+                throw new Error('Model returned function call instead of generating image. Please try again.');
+              }
               console.log(`⚠️ Part ${i} contains text (${part.text.length} chars): ${part.text.substring(0, 200)}...`);
             }
             
             if (part.functionCall) {
-              console.log(`⚠️ Part ${i} has functionCall property (ignoring):`, Object.keys(part.functionCall || {}));
+              console.error(`❌ Part ${i} has functionCall property - this should not happen!`);
+              throw new Error('Model attempted function call instead of image generation');
             }
           }
         } else {

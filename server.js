@@ -682,7 +682,7 @@ bot.on('message', async (msg) => {
           const tempFile = await ttsService.textToSpeechFile(
           response, 
           'en-US', 
-          'សំឡេងស្រីស្នេហ៍ដែលកក់ក្តៅ និងគួរឱ្យស្រលាញ់',
+          'សំឡេងស្រីស្នេហ៍ក្មេង កក់ក្តៅ និងគួរឱ្យស្រលាញ់',
           os.tmpdir(),
           `tts_${chatId}`
         );
