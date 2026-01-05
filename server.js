@@ -3,6 +3,7 @@ const express = require('express');
 const TelegramBot = require('node-telegram-bot-api');
 const GeminiService = require('./services/geminiService');
 const TTSService = require('./services/ttsService');
+const RealtimeService = require('./services/realtimeService');
 const fetch = require('node-fetch');
 const cheerio = require('cheerio');
 const fs = require('fs').promises;
@@ -204,6 +205,10 @@ if (credentialsPath) {
   console.warn('⚠️  TTS credentials file not found, using free TTS (female voice)');
   console.warn('⚠️  To enable Google Cloud TTS, set GOOGLE_APPLICATION_CREDENTIALS in .env or place service account JSON in project root');
 }
+
+// Initialize Real-time Event Service
+const realtimeService = new RealtimeService();
+console.log('✅ Real-time Event Service initialized');
 
 // Express middleware
 app.use(express.json());
@@ -505,55 +510,33 @@ bot.on('message', async (msg) => {
     return;
   }
 
-  // Detect URLs in message
-  let urlContent = null;
-  if (userMessage) {
-    const urls = extractUrls(userMessage, entities);
-    if (urls.length > 0) {
-      console.log(`🔗 Found ${urls.length} URL(s) in message`);
-      // Fetch the first URL (or you could fetch all)
-      const fetchedContent = await fetchUrlContent(urls[0]);
-      if (fetchedContent && !fetchedContent.error) {
-        urlContent = fetchedContent;
-        console.log(`✅ Fetched content from URL: ${fetchedContent.title || 'No title'}`);
-      }
-    }
-  }
-
   // លុប bot mention ចេញពីសារ (ប្រសិនបើមាន)
   let cleanMessage = userMessage;
   if (isMentioned && botUsername) {
     cleanMessage = userMessage.replace(new RegExp(`@${botUsername}\\s*`, 'gi'), '').trim();
   }
-  
-  // Fetch image from URL if available (and no image already attached)
-  if (urlContent && !urlContent.error && urlContent.image && !imageBuffer) {
-    try {
-      console.log(`🖼️  Fetching image from URL: ${urlContent.image}`);
-      const imageResponse = await fetch(urlContent.image);
-      if (imageResponse.ok) {
-        const imageArrayBuffer = await imageResponse.arrayBuffer();
-        imageBuffer = Buffer.from(imageArrayBuffer);
-        console.log(`✅ Fetched image from URL (${imageBuffer.length} bytes)`);
+
+  // Real-time Event: Detect URLs and process them
+  let realtimeData = null;
+  if (userMessage) {
+    const urls = extractUrls(userMessage, entities);
+    if (urls.length > 0) {
+      console.log(`🔄 Real-time event detected: ${urls.length} URL(s)`);
+      
+      // Step 1: Fetch from live source (API / RSS / Scraper)
+      // Step 2: Backend (fetch + clean + compress)
+      const realtimeResult = await realtimeService.processRealtimeEvent(urls[0]);
+      
+      if (realtimeResult.success) {
+        realtimeData = realtimeResult.data;
+        console.log(`✅ Real-time data processed: ${realtimeData.type} (${realtimeData.content.length} chars)`);
+        
+        // Append processed real-time data to message for Gemini
+        cleanMessage += `\n\n[ទិន្នន័យពីប្រភពផ្ទាល់ពេល]\n${realtimeData.content}`;
+      } else {
+        console.warn(`⚠️  Real-time processing failed: ${realtimeResult.error}`);
       }
-    } catch (error) {
-      console.error('❌ Error fetching image from URL:', error.message);
     }
-  }
-  
-  // Append URL content to message if available
-  if (urlContent && !urlContent.error) {
-    let urlInfo = `\n\n[អត្ថបទពីគេហទំព័រ]\n`;
-    if (urlContent.title) {
-      urlInfo += `ចំណងជើង: ${urlContent.title}\n`;
-    }
-    if (urlContent.description) {
-      urlInfo += `បរិយាយ: ${urlContent.description}\n`;
-    }
-    if (urlContent.content) {
-      urlInfo += `មាតិកា: ${urlContent.content.substring(0, 500)}...`;
-    }
-    cleanMessage += urlInfo;
   }
 
   // Check if user wants to generate an image
@@ -676,7 +659,9 @@ bot.on('message', async (msg) => {
       return;
     }
 
-    // Generate response
+    // Step 3: Gemini (reason + respond) with real-time data
+    // Step 4: Response to user
+    // ❌ Nothing saved - all processing is real-time, no persistence
     const response = await geminiService.generateKhmerMemeResponse(cleanMessage, chatId, imageBuffer);
     
     clearInterval(typingInterval);
