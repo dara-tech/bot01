@@ -636,16 +636,16 @@ bot.on('message', async (msg) => {
           const imageBuffer = Buffer.from(imageResult.imageData, 'base64');
           console.log(`✅ Converted to buffer: ${imageBuffer.length} bytes`);
           
-          // Send image to Telegram with a contextual response
-          // Generate a contextual response about the image using conversation history
+          // Send image to Telegram with self-aware contextual response
+          // Generate a response where she's aware she created and is sending the image
           const contextualResponse = await geminiService.generateKhmerMemeResponse(
-            `បានបង្កើតរូប: ${imagePrompt}. មានអ្វីចង់ពិពណ៌នាអំពីរូបនេះ?`,
+            `ខ្ញុំបានបង្កើតរូបនេះសម្រាប់អ្នកហើយ! រូបនេះគឺ: ${imagePrompt}. តើអ្នកចូលចិត្តរូបនេះដែលខ្ញុំបានធ្វើឱ្យអ្នកទេ?`,
             chatId,
             null
           );
           
           await bot.sendPhoto(chatId, imageBuffer, {
-            caption: contextualResponse || `✅ រូបដែលបង្កើត: ${imagePrompt}`
+            caption: contextualResponse || `ខ្ញុំបានបង្កើតរូបនេះសម្រាប់អ្នក! 💕`
           });
           console.log(`✅ Image generated and sent successfully with contextual response!`);
         } catch (sendError) {

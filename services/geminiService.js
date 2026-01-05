@@ -175,6 +175,7 @@ class GeminiService {
       let conversationHistory = this.conversationHistory.get(chatId) || [];
       
       // Build context-aware prompt by including recent conversation
+      // Include self-awareness that Dara (the girlfriend) is creating this image
       let contextualPrompt = prompt;
       if (conversationHistory.length > 0) {
         // Get last few messages for context (last 3 exchanges = 6 messages)
@@ -185,13 +186,16 @@ class GeminiService {
           if (msg.role === 'user') {
             contextSummary += `User: ${msg.text}\n`;
           } else if (msg.role === 'model') {
-            contextSummary += `Previous response: ${msg.text}\n`;
+            contextSummary += `Dara (you): ${msg.text}\n`;
           }
         }
         
-        // Enhance prompt with context
-        contextualPrompt = `${contextSummary}\nNow generate an image based on: ${prompt}`;
-        console.log(`🎨 Generating image with context (${conversationHistory.length} messages in history)`);
+        // Enhance prompt with context and self-awareness
+        contextualPrompt = `You are Dara, creating an image for your boyfriend. Context:\n${contextSummary}\nNow create an image based on: ${prompt}`;
+        console.log(`🎨 Generating image with self-aware context (${conversationHistory.length} messages in history)`);
+      } else {
+        // Even without history, include self-awareness
+        contextualPrompt = `You are Dara creating an image for your boyfriend. Create: ${prompt}`;
       }
       
       console.log(`🎨 Image prompt: ${prompt.substring(0, 80)}...`);
