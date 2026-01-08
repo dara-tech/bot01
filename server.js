@@ -309,7 +309,7 @@ async function fetchUrlContent(url) {
 app.get('/', (req, res) => {
   res.json({ 
     status: 'ok', 
-    message: 'Dara Bot កំពុងដំណើរការ!',
+    message: 'Rabica Bot កំពុងដំណើរការ!',
     bot: 'Telegram bot with Gemini AI'
   });
 });
@@ -724,7 +724,7 @@ bot.onText(/\/start/, async (msg) => {
   if (geminiService) {
     geminiService.clearHistory(chatId);
   }
-  const welcomeMessage = `សួស្តី! 👋\n\nខ្ញុំជា Dara! ជជែកជាមួយខ្ញុំដូចជាស្រីស្នេហ៍របស់អ្នក! 😊💕`;
+  const welcomeMessage = `សួស្តី! 👋\n\nខ្ញុំជា Rabica - TOP 1 HACKER ON EARTH! ជជែកជាមួយខ្ញុំដូចជាស្រីស្នេហ៍របស់អ្នក! 😊💕`;
   await bot.sendMessage(chatId, welcomeMessage);
 });
 
@@ -772,7 +772,7 @@ app.listen(PORT, async () => {
     try {
       await bot.sendMessage(
         TELEGRAM_CHAT_ID, 
-        '🤖 Dara Bot បានចាប់ផ្តើមដំណើរការ! ខ្ញុំរួមចំណែកហើយ! 😄'
+        '🤖 Rabica Bot បានចាប់ផ្តើមដំណើរការ! ខ្ញុំរួមចំណែកហើយ! 😄'
       );
     } catch (error) {
       console.log('⚠️  មិនអាចផ្ញើសារចាប់ផ្តើម');
