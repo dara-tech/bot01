@@ -114,7 +114,7 @@ class TTSService {
     const lowerText = text.toLowerCase();
     const textLength = text.length;
 
-    // Emotion patterns (English and Khmer)
+    // Emotion patterns (en-US and Khmer)
     const emotionPatterns = {
       // Happy/Excited (younger, bubbly)
       happy: {

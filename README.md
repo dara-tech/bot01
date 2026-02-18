@@ -92,6 +92,51 @@ dara_bot/
 - `GEMINI_API_KEY` - Your Google Gemini API key (required)
 - `TELEGRAM_CHAT_ID` - Optional chat/group ID to restrict bot responses to a specific chat
 - `PORT` - Server port (defaults to 3000)
+- `GOOGLE_APPLICATION_CREDENTIALS` - Path to Google Cloud service account JSON file (optional, for TTS and voice message transcription)
+- `SPEECH_LANGUAGE` - Language code for voice message transcription (default: `km-KH` for Khmer). Use `en-US` for English.
+- `MAX_VOICE_SIZE` - Max voice message size in bytes (default: 1048576 = 1MB)
+
+## Text-to-Speech (TTS) Setup
+
+The bot supports voice messages using Google Cloud Text-to-Speech. To enable it:
+
+### Option 1: Using Environment Variable (Recommended)
+1. Get your Google Cloud service account JSON key file from [Google Cloud Console](https://console.cloud.google.com/iam-admin/serviceaccounts)
+2. Place the file somewhere secure on your machine (NOT in the project directory)
+3. Set the environment variable:
+   ```bash
+   export GOOGLE_APPLICATION_CREDENTIALS=/path/to/your/service-account-key.json
+   ```
+   Or add to your `.env` file:
+   ```
+   GOOGLE_APPLICATION_CREDENTIALS=/path/to/your/service-account-key.json
+   ```
+
+### Option 2: Local File (Development Only)
+1. Place your service account JSON file in the project root directory
+2. The bot will automatically detect it (but it won't be committed to Git)
+
+**Important Security Notes:**
+- ✅ The credentials file should exist **locally** on the machine where the bot runs
+- ❌ The credentials file should **NEVER** be committed to Git (it's in `.gitignore`)
+- 🔄 If credentials were exposed, **rotate/regenerate** them immediately
+- 🚀 For production, use environment variables or secure secret management
+
+**Without credentials:** The bot will use a free TTS fallback (female voice only)
+
+## Voice messages (Speech-to-Text)
+
+The bot can **read** incoming voice messages: it transcribes them with Google Cloud Speech-to-Text (same credentials as TTS) and then replies as if the user had typed the transcribed text. Send a voice note in the chat and the bot will respond.
+
+- Uses the same `GOOGLE_APPLICATION_CREDENTIALS` as TTS.
+- Default is Khmer (`km-KH`); English is tried as alternative for mixed speech. Set `SPEECH_LANGUAGE=en-US` for English-only. If transcription fails, the user is asked to try again or type instead.
+- Voice messages over 1MB are rejected (use `MAX_VOICE_SIZE` to change).
+
+## DaraIDE – Code Agent IDE (macOS)
+
+A native Swift/SwiftUI macOS app in the `DaraIDE/` folder that uses this server as a code agent: open a workspace, chat with the agent, and apply suggested edits. See [DaraIDE/README.md](DaraIDE/README.md) for setup and usage.
+
+- **Backend:** `POST /api/agent` — body: `message`, `sessionId`, `workspaceRoot`, `currentFilePath`, `currentFileContent`, `selectedText`. Returns `{ response, actions }` where `actions` can be `edit` (path, oldText, newText) or `run` (command).
 
 ## Notes
 

@@ -3,6 +3,7 @@ const express = require('express');
 const TelegramBot = require('node-telegram-bot-api');
 const GeminiService = require('./services/geminiService');
 const TTSService = require('./services/ttsService');
+const SpeechService = require('./services/speechService');
 const RealtimeService = require('./services/realtimeService');
 const fetch = require('node-fetch');
 const cheerio = require('cheerio');
@@ -17,6 +18,7 @@ const PORT = process.env.PORT || 3000;
 const MAX_CONCURRENT_REQUESTS = parseInt(process.env.MAX_CONCURRENT_REQUESTS) || 10;
 const RATE_LIMIT_PER_USER = parseInt(process.env.RATE_LIMIT_PER_USER) || 5; // requests per minute
 const MAX_IMAGE_SIZE = parseInt(process.env.MAX_IMAGE_SIZE) || 2 * 1024 * 1024; // 2MB
+const MAX_VOICE_SIZE = parseInt(process.env.MAX_VOICE_SIZE) || 1024 * 1024; // 1MB
 
 // Request queue and rate limiting
 let activeRequests = 0;
@@ -206,12 +208,26 @@ if (credentialsPath) {
   console.warn('⚠️  To enable Google Cloud TTS, set GOOGLE_APPLICATION_CREDENTIALS in .env or place service account JSON in project root');
 }
 
+// Initialize Speech-to-Text (voice messages)
+const speechService = new SpeechService();
+
 // Initialize Real-time Event Service
 const realtimeService = new RealtimeService();
 console.log('✅ Real-time Event Service initialized');
 
 // Express middleware
 app.use(express.json());
+
+// CORS for Telegram Web App
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+});
 
 // TTS function removed - now using TTSService module
 
@@ -305,14 +321,72 @@ async function fetchUrlContent(url) {
   }
 }
 
-// Health check endpoint
-app.get('/', (req, res) => {
+// API endpoint for Telegram Web App
+app.post('/api/message', async (req, res) => {
+  try {
+    const { message, userId, chatId } = req.body;
+    
+    if (!message) {
+      return res.status(400).json({ error: 'Message is required' });
+    }
+    
+    // Use your existing Gemini service
+    const response = await geminiService.generateKhmerMemeResponse(
+      message, 
+      chatId || userId
+    );
+    
+    res.json({ response });
+  } catch (error) {
+    console.error('API Error:', error);
+    res.status(500).json({ error: 'មានបញ្ហាក្នុងការទទួលសារ' });
+  }
+});
+
+// Code Agent API for DaraIDE (macOS IDE)
+app.post('/api/agent', async (req, res) => {
+  try {
+    const {
+      message,
+      sessionId = 'default',
+      workspaceRoot = '',
+      currentFilePath = '',
+      currentFileContent = '',
+      selectedText = ''
+    } = req.body;
+
+    if (!message || typeof message !== 'string') {
+      return res.status(400).json({ error: 'message (string) is required' });
+    }
+
+    if (!geminiService) {
+      return res.status(503).json({ error: 'Gemini service not available' });
+    }
+
+    const { response, actions } = await geminiService.generateCodeAgentResponse(
+      message,
+      sessionId,
+      { workspaceRoot, currentFilePath, currentFileContent, selectedText }
+    );
+
+    res.json({ response, actions: actions || [] });
+  } catch (error) {
+    console.error('Agent API Error:', error);
+    res.status(500).json({ error: error.message || 'Agent request failed' });
+  }
+});
+
+// Health check endpoint (for API status)
+app.get('/api/status', (req, res) => {
   res.json({ 
     status: 'ok', 
     message: 'Rabica Bot កំពុងដំណើរការ!',
     bot: 'Telegram bot with Gemini AI'
   });
 });
+
+// Serve React app static files
+app.use(express.static(path.join(__dirname, 'webapp/build')));
 
 // Webhook endpoint (optional, for production)
 app.post(`/webhook/${TELEGRAM_TOKEN}`, (req, res) => {
@@ -374,8 +448,10 @@ bot.on('message', async (msg) => {
     return;
   }
 
-  // Only log in development
-  if (process.env.NODE_ENV !== 'production') {
+  // Log incoming message type (so you can see if voice was received – if 409, you won't see voice here)
+  if (msg.voice || msg.audio) {
+    console.log(`🎤 Voice message received (chat: ${chatId}), processing...`);
+  } else if (process.env.NODE_ENV !== 'production') {
     console.log(`📨 ទទួលសារពី chat ID: ${chatId}, ប្រភេទ: ${chatType}`);
   }
 
@@ -411,8 +487,9 @@ bot.on('message', async (msg) => {
       }
     }
     
-    // ប្រសិនបើនៅក្នុង group ហើយមិនត្រូវបាន mention ទេ លែងឆ្លើយតប (លើកលែងតែ TELEGRAM_CHAT_ID ត្រូវគ្នា)
-    if (!isMentioned) {
+    // ប្រសិនបើនៅក្នុង group ហើយមិនត្រូវបាន mention ទេ លែងឆ្លើយតប (លើកលែងតែ TELEGRAM_CHAT_ID ត្រូវគ្នា ឬផ្ញើសំឡេង)
+    const hasVoiceOrAudio = msg.voice || msg.audio;
+    if (!isMentioned && !hasVoiceOrAudio) {
       if (TELEGRAM_CHAT_ID && String(chatId) === String(TELEGRAM_CHAT_ID)) {
         // អនុញ្ញាត
       } else {
@@ -497,6 +574,44 @@ bot.on('message', async (msg) => {
       }
     } catch (error) {
       console.error('កំហុសក្នុងការទាញយកឯកសាររូបភាព:', error);
+    }
+  }
+
+  // Handle voice messages (speech-to-text)
+  if (msg.voice || msg.audio) {
+    const voiceOrAudio = msg.voice || msg.audio;
+    if (voiceOrAudio.file_size && voiceOrAudio.file_size > MAX_VOICE_SIZE) {
+      await bot.sendMessage(chatId, `⚠️ សំឡេងវែងពេក (${Math.round(voiceOrAudio.file_size / 1024)}KB). សូមថតខ្លីជាង 1 នាទី។`);
+      return;
+    }
+    try {
+      const fileId = voiceOrAudio.file_id;
+      const fileStream = await bot.getFileStream(fileId);
+      const chunks = [];
+      let totalSize = 0;
+      for await (const chunk of fileStream) {
+        totalSize += chunk.length;
+        if (totalSize > MAX_VOICE_SIZE) {
+          await bot.sendMessage(chatId, '⚠️ សំឡេងធំពេក។ សូមថតខ្លីជាង។');
+          return;
+        }
+        chunks.push(chunk);
+      }
+      const voiceBuffer = Buffer.concat(chunks);
+      console.log(`🎤 Voice downloaded: ${voiceBuffer.length} bytes, transcribing...`);
+      const languageCode = process.env.SPEECH_LANGUAGE || 'km-KH';
+      const transcribed = await speechService.transcribe(voiceBuffer, languageCode);
+      if (transcribed && transcribed.trim().length > 0) {
+        userMessage = transcribed.trim();
+        console.log(`📝 Transcribed: "${userMessage.slice(0, 80)}${userMessage.length > 80 ? '…' : ''}"`);
+      } else {
+        await bot.sendMessage(chatId, '⚠️ ខ្ញុំអានសំឡេងមិនច្បាស់ ឬមិនមានកម្មវិធីអានសំឡេង។ សូមសាកថាម្តងទៀត ឬវាយអត្ថបទ។');
+        return;
+      }
+    } catch (error) {
+      console.error('កំហុសអានសំឡេង:', error);
+      await bot.sendMessage(chatId, '⚠️ មានបញ្ហាក្នុងការអានសំឡេង។ សូមវាយអត្ថបទ។');
+      return;
     }
   }
 
@@ -681,7 +796,7 @@ bot.on('message', async (msg) => {
           console.log('🎤 Converting text to speech...');
           const tempFile = await ttsService.textToSpeechFile(
           response, 
-          'en-US', 
+          'km-KH', 
           'សំឡេងស្រីស្នេហ៍ក្មេង កក់ក្តៅ និងគួរឱ្យស្រលាញ់',
           os.tmpdir(),
           `tts_${chatId}`
@@ -749,13 +864,23 @@ bot.on('polling_error', (error) => {
   if (error.code === 'ETELEGRAM' && error.response && error.response.body) {
     const errorBody = error.response.body;
     if (errorBody.error_code === 409) {
-      console.error('⚠️  មាន bot instance ផ្សេងកំពុងដំណើរការរួចហើយ!');
-      console.error('⚠️  សូមបិទ instance ផ្សេងទៀត ឬរង់ចាំសិន...');
+      console.error('⚠️  409: Another bot instance is receiving updates (only ONE can poll at a time).');
+      console.error('⚠️  Stop the other instance so this server gets messages: close other terminals running this bot, or pause/stop the bot on Render (or other host).');
       // Don't exit, just log - the bot will retry
       return;
     }
   }
   console.error('កំហុស polling:', error.message || error);
+});
+
+// Catch-all handler for React routing (must be last)
+// Don't serve React app for API routes or webhook
+app.get('*', (req, res) => {
+  if (req.path.startsWith('/api/') || req.path.startsWith('/webhook')) {
+    return res.status(404).json({ error: 'Not found' });
+  }
+  // Serve React app for all other routes
+  res.sendFile(path.join(__dirname, 'webapp/build', 'index.html'));
 });
 
 // ចាប់ផ្តើម Express server

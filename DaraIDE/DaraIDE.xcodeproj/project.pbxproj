@@ -1,0 +1,250 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+		/* Build configuration list - project */
+		A1000001 /* Build configuration list for PBXProject "DaraIDE" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A1000002 /* Debug */,
+				A1000003 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A1000002 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		A1000003 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				SDKROOT = macosx;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+			};
+			name = Release;
+		};
+
+		/* Target - DaraIDE app */
+		A2000001 /* DaraIDE */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A2000002;
+			buildPhases = (
+				A2000003 /* Sources */,
+				A2000004 /* Frameworks */,
+				A2000005 /* Resources */,
+			);
+			buildRules = ();
+			dependencies = ();
+			name = DaraIDE;
+			productName = DaraIDE;
+			productReference = A2000006 /* DaraIDE.app */;
+			productType = "com.apple.product-type.application";
+		};
+		A2000002 /* Build configuration list for PBXNativeTarget "DaraIDE" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A2000007 /* Debug */,
+				A2000008 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A2000003 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A3000001 /* DaraIDEApp.swift */,
+				A3000002 /* ContentView.swift */,
+				A3000003 /* AgentService.swift */,
+				A3000004 /* Models.swift */,
+				A3000005 /* FileTreeNode.swift */,
+				A3000006 /* CodeEditorView.swift */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A2000004 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A3000010 /* AppKit.framework */,
+				A3000011 /* SwiftUI.framework */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A2000005 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A3000007 /* Assets.xcassets */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A2000006 /* DaraIDE.app */ = {
+			isa = PBXFileReference;
+			explicitFileType = wrapper.application;
+			includeInIndex = 0;
+			path = DaraIDE.app;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		A2000007 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_YES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.dara.ide;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		A2000008 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_YES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.dara.ide;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+
+		/* File references */
+		A3000001 /* DaraIDEApp.swift */ = { isa = PBXBuildFile; fileRef = A4000001; };
+		A3000002 /* ContentView.swift */ = { isa = PBXBuildFile; fileRef = A4000002; };
+		A3000003 /* AgentService.swift */ = { isa = PBXBuildFile; fileRef = A4000003; };
+		A3000004 /* Models.swift */ = { isa = PBXBuildFile; fileRef = A4000004; };
+		A3000005 /* FileTreeNode.swift */ = { isa = PBXBuildFile; fileRef = A4000005; };
+		A3000006 /* CodeEditorView.swift */ = { isa = PBXBuildFile; fileRef = A4000006; };
+		A3000007 /* Assets.xcassets */ = { isa = PBXBuildFile; fileRef = A4000007; };
+		A3000010 /* AppKit.framework */ = { isa = PBXBuildFile; fileRef = A4000010; };
+		A3000011 /* SwiftUI.framework */ = { isa = PBXBuildFile; fileRef = A4000011; };
+
+		A4000001 /* DaraIDEApp.swift */ = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DaraIDEApp.swift; sourceTree = "<group>"; };
+		A4000002 /* ContentView.swift */ = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		A4000003 /* AgentService.swift */ = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentService.swift; sourceTree = "<group>"; };
+		A4000004 /* Models.swift */ = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		A4000005 /* FileTreeNode.swift */ = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileTreeNode.swift; sourceTree = "<group>"; };
+		A4000006 /* CodeEditorView.swift */ = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodeEditorView.swift; sourceTree = "<group>"; };
+		A4000007 /* Assets.xcassets */ = { isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		A4000010 /* AppKit.framework */ = { isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppKit.framework; path = System/Library/Frameworks/AppKit.framework; sourceTree = SDKROOT; };
+		A4000011 /* SwiftUI.framework */ = { isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+
+		/* Groups */
+		A5000001 /* DaraIDE */ = {
+			isa = PBXGroup;
+			children = (
+				A4000001 /* DaraIDEApp.swift */,
+				A4000002 /* ContentView.swift */,
+				A4000003 /* AgentService.swift */,
+				A4000004 /* Models.swift */,
+				A4000005 /* FileTreeNode.swift */,
+				A4000006 /* CodeEditorView.swift */,
+				A4000007 /* Assets.xcassets */,
+			);
+			path = DaraIDE;
+			sourceTree = "<group>";
+		};
+		A5000002 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				A4000010 /* AppKit.framework */,
+				A4000011 /* SwiftUI.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		A5000003 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A2000006 /* DaraIDE.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+
+		/* Project root */
+		A6000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1500;
+				LastUpgradeCheck = 1500;
+			};
+			buildConfigurationList = A1000001;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = ( en, Base );
+			mainGroup = A6000002;
+			productRefGroup = A5000003;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = ( A2000001 /* DaraIDE */ );
+		};
+		A6000002 /* Main group */ = {
+			isa = PBXGroup;
+			children = (
+				A5000001 /* DaraIDE */,
+				A5000002 /* Frameworks */,
+				A5000003 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+	};
+	rootObject = A6000001;
+}

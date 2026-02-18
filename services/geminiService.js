@@ -1,5 +1,6 @@
 const { GoogleGenAI } = require('@google/genai');
 const RABICA_SYSTEM_INSTRUCTION = require('../config/systemInstruction');
+const CODE_AGENT_INSTRUCTION = require('../config/codeAgentInstruction');
 const { cleanLaTeXFormatting } = require('../utils/textDetection');
 
 // Initialize Gemini AI service
@@ -384,6 +385,88 @@ class GeminiService {
         error: error.message || "មានបញ្ហាក្នុងការបង្កើតរូប"
       };
     }
+  }
+
+  // Code Agent: generate response + optional edit/run actions for DaraIDE
+  async generateCodeAgentResponse(message, sessionId, context = {}) {
+    const {
+      workspaceRoot = '',
+      currentFilePath = '',
+      currentFileContent = '',
+      selectedText = ''
+    } = context;
+
+    let conversationHistory = this.conversationHistory.get(`agent:${sessionId}`) || [];
+
+    const contextBlock = [
+      workspaceRoot && `Workspace: ${workspaceRoot}`,
+      currentFilePath && `Current file: ${currentFilePath}`,
+      currentFileContent && `Current file content:\n\`\`\`\n${currentFileContent.slice(0, 15000)}\n\`\`\``,
+      selectedText && `Selected text:\n\`\`\`\n${selectedText}\n\`\`\``
+    ].filter(Boolean).join('\n');
+
+    const userContent = contextBlock
+      ? `[Context]\n${contextBlock}\n\n[User]\n${message}`
+      : message;
+
+    const contents = conversationHistory.map(msg => ({
+      role: msg.role,
+      parts: [{ text: msg.text }]
+    }));
+
+    contents.push({ role: 'user', parts: [{ text: userContent }] });
+
+    const response = await this.ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents,
+      config: {
+        systemInstruction: CODE_AGENT_INSTRUCTION,
+        temperature: 0.4,
+        topP: 0.9,
+        topK: 40
+      }
+    });
+
+    const text = response.text;
+    if (!text) throw new Error('Empty response from AI');
+
+    const cleanedText = cleanLaTeXFormatting(text);
+    const actions = this._parseAgentActions(text);
+
+    conversationHistory.push({ role: 'user', text: userContent });
+    conversationHistory.push({ role: 'model', text: cleanedText });
+    if (conversationHistory.length > this.maxHistorySize) {
+      conversationHistory = conversationHistory.slice(-this.maxHistorySize);
+    }
+    this.conversationHistory.set(`agent:${sessionId}`, conversationHistory);
+    this.conversationTimestamps.set(`agent:${sessionId}`, Date.now());
+
+    return { response: cleanedText, actions };
+  }
+
+  _parseAgentActions(text) {
+    const actions = [];
+    const jsonBlockRe = /```(?:json)?\s*([\s\S]*?)```/g;
+    let m;
+    while ((m = jsonBlockRe.exec(text)) !== null) {
+      const raw = m[1].trim();
+      try {
+        const parsed = JSON.parse(raw);
+        const list = Array.isArray(parsed) ? parsed : [parsed];
+        for (const item of list) {
+          if (item && typeof item.type === 'string') {
+            if (item.type === 'edit' && item.path && item.oldText != null && item.newText != null) {
+              actions.push({ type: 'edit', path: item.path, oldText: item.oldText, newText: item.newText });
+            } else if (item.type === 'run' && item.command) {
+              actions.push({ type: 'run', command: item.command });
+            }
+          }
+        }
+      } catch (_) {
+        // ignore invalid JSON blocks
+      }
+    }
+    return actions;
   }
 
   // Clear conversation history for a chat
