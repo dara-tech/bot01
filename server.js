@@ -746,7 +746,12 @@ bot.on('message', async (msg) => {
     // Step 3: Gemini (reason + respond) with real-time data
     // Step 4: Response to user
     // ❌ Nothing saved - all processing is real-time, no persistence
-    const response = await geminiService.generateKhmerMemeResponse(cleanMessage, chatId, imageBuffer);
+    // If user requested TTS, ask AI to keep answer shorter but meaningful (better for voice)
+    let promptForAI = cleanMessage;
+    if (wantsTTS) {
+      promptForAI += '\n\n[VOICE_MODE] សូមឆ្លើយឱ្យខ្លីច្បាស់ ប្រហែល ៣–៥ ប្រយោគ (អតិបរមា ~៣០០–៤០០ តួអក្សរ) ដើម្បីងាយបម្លែងជាសំឡេង និងងាយស្តាប់។';
+    }
+    const response = await geminiService.generateKhmerMemeResponse(promptForAI, chatId, imageBuffer);
     
     clearInterval(typingInterval);
     

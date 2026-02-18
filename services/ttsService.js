@@ -236,11 +236,8 @@ class TTSService {
         'gemini-2.5-pro-tts',
       ];
 
-      // Gemini voices - younger-sounding female voices (try in order)
-      // Leda: youthful and energetic female voice
-      // Aoede: good female voice
-      // Callirrhoe: also great female voice
-      const geminiVoices = ['Leda', 'Aoede', 'Callirrhoe'];
+      // Use Leda only (youthful, energetic female voice) like before
+      const geminiVoices = ['Leda'];
 
       for (const model of geminiModels) {
         for (const speaker of geminiVoices) {
