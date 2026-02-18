@@ -584,7 +584,7 @@ bot.on('message', async (msg) => {
         chunks.push(chunk);
       }
       const voiceBuffer = Buffer.concat(chunks);
-      const languageCode = process.env.SPEECH_LANGUAGE || 'km-KH';
+      const languageCode = process.env.SPEECH_LANGUAGE || 'en-US';
       const transcribed = await speechService.transcribe(voiceBuffer, languageCode);
       if (transcribed && transcribed.trim().length > 0) {
         userMessage = transcribed.trim();
@@ -769,7 +769,7 @@ bot.on('message', async (msg) => {
 
           const tempFile = await ttsService.textToSpeechFile(
           response, 
-          'km-KH', 
+          'en-US', 
           'សំឡេងស្រីស្នេហ៍ក្មេង កក់ក្តៅ និងគួរឱ្យស្រលាញ់',
           os.tmpdir(),
           `tts_${chatId}`
@@ -781,9 +781,7 @@ bot.on('message', async (msg) => {
           // Clean up temp file
           await fs.unlink(tempFile).catch(() => {});
         } catch (ttsError) {
-          if (process.env.NODE_ENV !== 'production') {
-            console.warn('[TTS] Failed:', ttsError?.message || ttsError);
-          }
+          console.warn('[TTS] Cannot send voice – reason:', ttsError?.message || String(ttsError));
           await sendFormattedMessage(chatId, response);
           await bot.sendMessage(chatId, '⚠️ មិនអាចបន្លឺសំឡេងបាន ប៉ុន្តែបានផ្ញើជាអត្ថបទហើយ!');
         }

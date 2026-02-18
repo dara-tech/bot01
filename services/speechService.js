@@ -44,8 +44,8 @@ class SpeechService {
       return '';
     }
 
-    const lang = languageCode === 'auto' ? 'km-KH' : languageCode;
-    const alternativeLangs = lang === 'km-KH' ? ['en-US'] : ['km-KH'];
+    const lang = languageCode === 'auto' ? 'en-US' : languageCode;
+    const alternativeLangs = lang === 'en-US' ? ['km-KH'] : ['en-US'];
 
     const getText = (response) => {
       if (!response.results || response.results.length === 0) return '';
@@ -75,7 +75,7 @@ class SpeechService {
       if (text) return text;
 
       // Fallback: try the other language if primary returned nothing
-      const fallbackLang = lang === 'km-KH' ? 'en-US' : 'km-KH';
+      const fallbackLang = lang === 'en-US' ? 'km-KH' : 'en-US';
       const [fallbackResponse] = await this.client.recognize({
         config: {
           encoding: 'OGG_OPUS',

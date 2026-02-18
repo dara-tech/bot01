@@ -286,17 +286,16 @@ class TTSService {
               }
             } else {
               const errorText = await response.text();
-              // Continue to next voice/model
+              console.warn('[TTS] Gemini TTS failed:', response.status, errorText?.slice(0, 200) || '');
               continue;
             }
           } catch (error) {
-            // Continue to next voice/model
+            console.warn('[TTS] Gemini TTS error:', error?.message || error);
             continue;
           }
         }
       }
-      
-      // If all Gemini models/voices failed
+      console.warn('[TTS] All Gemini TTS attempts failed, trying free fallback');
     }
 
     // --- STRATEGY 2: Free Fallback (FEMALE ONLY) ---
@@ -341,13 +340,13 @@ class TTSService {
           ]);
           
           if (!response.ok) {
-            // If rate limited (429), retry with backoff
+            lastError = new Error(`HTTP ${response.status}`);
             if (response.status === 429 && retry < maxRetries - 1) {
               lastError = new Error(`HTTP ${response.status} (Rate Limited)`);
-              continue; // Retry this URL
+              continue;
             }
-            lastError = new Error(`HTTP ${response.status}`);
-            break; // Try next URL
+            console.warn('[TTS] Free TTS HTTP', response.status);
+            break;
           }
           
           const buffer = await response.buffer();
@@ -355,10 +354,12 @@ class TTSService {
             return buffer;
           } else {
             lastError = new Error('Empty response from TTS service');
-            break; // Try next URL
+            console.warn('[TTS] Free TTS returned empty audio');
+            break;
           }
         } catch (error) {
           lastError = error;
+          console.warn('[TTS] Free TTS error:', error?.message || error);
           // If timeout or network error, retry
           if ((error.message.includes('timeout') || error.message.includes('ECONNREFUSED')) && retry < maxRetries - 1) {
             continue; // Retry
@@ -368,7 +369,7 @@ class TTSService {
       }
     }
     
-    // If all free TTS URLs failed, throw error
+    console.warn('[TTS] All free TTS failed. Last error:', lastError?.message || lastError);
     throw new Error(`TTS Failed entirely: ${lastError ? lastError.message : 'All free TTS endpoints failed'}`);
   }
 
