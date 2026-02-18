@@ -215,7 +215,7 @@ def main():
     )
     p.add_argument("message", nargs="?", default=None, help="Message to send (or use -m)")
     p.add_argument("-m", "--message", dest="message_flag", help="Message to send")
-    p.add_argument("-u", "--url", default="http://localhost:3000", help="Backend base URL")
+    p.add_argument("-u", "--url", default="https://bot01-97f8.onrender.com", help="Backend base URL")
     p.add_argument("--user-id", help="Optional user ID for /api/message")
     p.add_argument("--chat-id", help="Optional chat ID for /api/message")
     p.add_argument("--agent", action="store_true", help="Use /api/agent (code agent)")
