@@ -179,7 +179,6 @@ function App() {
       };
       setMessages(prev => [...prev, botMessage]);
     } catch (error) {
-      console.error('Error:', error);
       const errorMessage = {
         text: '> Error: Connection failed. Retrying...',
         type: 'system',

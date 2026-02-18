@@ -72,7 +72,6 @@ function rateLimitMiddleware(chatId) {
 // Telegram Bot Token
 const TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 if (!TELEGRAM_TOKEN) {
-  console.error('❌ ត្រូវការ TELEGRAM_BOT_TOKEN ក្នុង .env file!');
   process.exit(1);
 }
 
@@ -82,7 +81,6 @@ const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 // Gemini API Key (Google AI Studio)
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 if (!GEMINI_API_KEY) {
-  console.error('❌ ត្រូវការ GEMINI_API_KEY ក្នុង .env file!');
   process.exit(1);
 }
 
@@ -101,7 +99,6 @@ const bot = new TelegramBot(TELEGRAM_TOKEN, {
 let botUsername = null;
 bot.getMe().then((me) => {
   botUsername = me.username;
-  console.log(`🤖 Bot username: @${botUsername}`);
 });
 
 // Initialize Gemini AI Service
@@ -109,13 +106,8 @@ let geminiService = null;
 if (GEMINI_API_KEY) {
   try {
   geminiService = new GeminiService(GEMINI_API_KEY);
-    console.log('✅ Gemini AI Service initialized successfully');
-  } catch (error) {
-    console.error('❌ Failed to initialize Gemini AI Service:', error.message);
-  }
-} else {
-  console.warn('⚠️  GEMINI_API_KEY not found - Gemini AI features will not work');
-}
+  } catch (error) {}
+} else {}
 
 // Initialize TTS Service
 // Use credentials file path from environment or check for service account file in current directory
@@ -142,13 +134,8 @@ if (process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
     if (credsJson.type === 'service_account') {
       fsSync.writeFileSync(tempCredsFile, process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
       credentialsPath = tempCredsFile;
-      console.log(`📁 Found credentials from GOOGLE_APPLICATION_CREDENTIALS_JSON (temp file created)`);
-    } else {
-      console.warn(`⚠️  GOOGLE_APPLICATION_CREDENTIALS_JSON is not a service account`);
-    }
-  } catch (error) {
-    console.warn(`⚠️  Failed to parse GOOGLE_APPLICATION_CREDENTIALS_JSON: ${error.message}`);
-  }
+    } else {}
+  } catch (error) {}
 }
 
 // Option 2: File path from environment variable (or JSON string if it looks like JSON)
@@ -167,22 +154,13 @@ if (!credentialsPath && process.env.GOOGLE_APPLICATION_CREDENTIALS) {
       if (credsJson.type === 'service_account') {
         fsSync.writeFileSync(tempCredsFile, credsValue);
         credentialsPath = tempCredsFile;
-        console.log(`📁 Found credentials from GOOGLE_APPLICATION_CREDENTIALS (JSON string, temp file created)`);
-      } else {
-        console.warn(`⚠️  GOOGLE_APPLICATION_CREDENTIALS JSON is not a service account`);
-  }
-    } catch (error) {
-      console.warn(`⚠️  Failed to parse GOOGLE_APPLICATION_CREDENTIALS as JSON: ${error.message}`);
-    }
+      } else {}
+    } catch (error) {}
   } else {
-    // It's a file path
     try {
       fsSync.accessSync(credsValue);
       credentialsPath = credsValue;
-      console.log(`📁 Found credentials from environment: ${credentialsPath}`);
-    } catch (error) {
-      console.warn(`⚠️  GOOGLE_APPLICATION_CREDENTIALS path not accessible: ${credsValue}`);
-    }
+    } catch (error) {}
   }
 }
 
@@ -192,7 +170,6 @@ if (!credentialsPath) {
   try {
     fsSync.accessSync(localServiceAccount);
     credentialsPath = localServiceAccount;
-    console.log(`📁 Found local service account file: ${localServiceAccount}`);
   } catch (error) {
     // File doesn't exist, continue to next option
   }
@@ -201,11 +178,8 @@ if (!credentialsPath) {
 // Initialize TTS service with found credentials or use fallback
 if (credentialsPath) {
   ttsService = new TTSService(credentialsPath);
-  console.log(`✅ TTS Service initialized with credentials: ${credentialsPath}`);
 } else {
-  ttsService = new TTSService(); // Will use free fallback
-  console.warn('⚠️  TTS credentials file not found, using free TTS (female voice)');
-  console.warn('⚠️  To enable Google Cloud TTS, set GOOGLE_APPLICATION_CREDENTIALS in .env or place service account JSON in project root');
+  ttsService = new TTSService();
 }
 
 // Initialize Speech-to-Text (voice messages)
@@ -213,7 +187,6 @@ const speechService = new SpeechService();
 
 // Initialize Real-time Event Service
 const realtimeService = new RealtimeService();
-console.log('✅ Real-time Event Service initialized');
 
 // Express middleware
 app.use(express.json());
@@ -230,6 +203,50 @@ app.use((req, res, next) => {
 });
 
 // TTS function removed - now using TTSService module
+
+// Convert markdown to Telegram HTML so replies render bold, code, links
+function markdownToTelegramHtml(text) {
+  if (!text || typeof text !== 'string') return text;
+  const escapeHtml = (s) => String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+  const B = '\x01B\x02', _B = '\x01/B\x02';
+  const I = '\x01I\x02', _I = '\x01/I\x02';
+  const C = '\x01C\x02', _C = '\x01/C\x02';
+  const P = '\x01P\x02', _P = '\x01/P\x02';
+  const A = '\x01A\x02', _A = '\x01/A\x02';
+  let out = text;
+  out = out.replace(/(\n)(\s*)([-*]\s|\d+\.\s|១\.\s|២\.\s|៣\.\s|៤\.\s|៥\.\s|៦\.\s|៧\.\s|៨\.\s|៩\.\s|១០\.\s)/g, '$1\n$2$3');
+  out = out.replace(/^(\s*)([-*])\s/mg, '$1• ');
+  out = out.replace(/```(\w*)\n?([\s\S]*?)```/g, (_, _lang, code) => P + code.trim() + _P);
+  out = out.replace(/`([^`]+)`/g, (_, code) => C + code + _C);
+  out = out.replace(/\*\*([\s\S]*?)\*\*/g, (_, c) => B + c + _B);
+  out = out.replace(/__([\s\S]*?)__/g, (_, c) => B + c + _B);
+  out = out.replace(/\*([^*]+)\*/g, (_, c) => I + c + _I);
+  out = out.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, t, u) => A + u + '\x03' + t + _A);
+  out = escapeHtml(out);
+  out = out.replace(/\x01B\x02/g, '<b>').replace(/\x01\/B\x02/g, '</b>');
+  out = out.replace(/\x01I\x02/g, '<i>').replace(/\x01\/I\x02/g, '</i>');
+  out = out.replace(/\x01C\x02/g, '<code>').replace(/\x01\/C\x02/g, '</code>');
+  out = out.replace(/\x01P\x02/g, '<pre>').replace(/\x01\/P\x02/g, '</pre>');
+  out = out.replace(/\x01A\x02([^\x03]+)\x03([\s\S]*?)\x01\/A\x02/g, (_, url, t) => '<a href="' + url + '">' + t + '</a>');
+  return out;
+}
+
+// Send message with HTML formatting; fallback to plain if Telegram rejects
+async function sendFormattedMessage(chatId, text) {
+  const html = markdownToTelegramHtml(text);
+  try {
+    await bot.sendMessage(chatId, html, { parse_mode: 'HTML' });
+  } catch (err) {
+    if (err.message && (err.message.includes('parse') || err.message.includes('HTML') || err.message.includes('can\'t parse'))) {
+      await bot.sendMessage(chatId, text);
+    } else {
+      throw err;
+    }
+  }
+}
 
 // Function to extract URLs from message text
 function extractUrls(text, entities) {
@@ -264,7 +281,6 @@ function extractUrls(text, entities) {
 // Function to fetch and parse URL content
 async function fetchUrlContent(url) {
   try {
-    console.log(`🔗 Fetching URL: ${url}`);
     
     // Set headers to mimic a browser
     const response = await fetch(url, {
@@ -313,7 +329,6 @@ async function fetchUrlContent(url) {
       image: ogImage
     };
   } catch (error) {
-    console.error(`❌ Error fetching URL ${url}:`, error.message);
     return {
       url,
       error: error.message
@@ -338,7 +353,6 @@ app.post('/api/message', async (req, res) => {
     
     res.json({ response });
   } catch (error) {
-    console.error('API Error:', error);
     res.status(500).json({ error: 'មានបញ្ហាក្នុងការទទួលសារ' });
   }
 });
@@ -371,7 +385,6 @@ app.post('/api/agent', async (req, res) => {
 
     res.json({ response, actions: actions || [] });
   } catch (error) {
-    console.error('Agent API Error:', error);
     res.status(500).json({ error: error.message || 'Agent request failed' });
   }
 });
@@ -398,13 +411,7 @@ app.post(`/webhook/${TELEGRAM_TOKEN}`, (req, res) => {
 function keepAlive() {
   const url = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
   
-  fetch(url)
-    .then(response => {
-      console.log(`🏓 Keep-alive ping successful: ${response.status}`);
-    })
-    .catch(error => {
-      console.log(`⚠️  Keep-alive ping failed: ${error.message}`);
-    });
+  fetch(url).then(() => {}).catch(() => {});
 }
 
 // Set up keep-alive ping every 12 minutes (720000 ms)
@@ -421,11 +428,8 @@ if (process.env.NODE_ENV !== 'production') {
       external: Math.round(memUsage.external / 1024 / 1024)
     };
     
-    if (memMB.heapUsed > 400) { // Warn if using more than 400MB
-      console.warn(`⚠️  High memory usage: ${memMB.heapUsed}MB / ${memMB.heapTotal}MB`);
-      if (global.gc) global.gc(); // Force GC if available
-    } else {
-      console.log(`💾 Memory: ${memMB.heapUsed}MB / ${memMB.heapTotal}MB | Active conversations: ${geminiService?.conversationHistory?.size || 0}`);
+    if (memMB.heapUsed > 400) {
+      if (global.gc) global.gc();
     }
   }, 5 * 60 * 1000);
 }
@@ -448,12 +452,6 @@ bot.on('message', async (msg) => {
     return;
   }
 
-  // Log incoming message type (so you can see if voice was received – if 409, you won't see voice here)
-  if (msg.voice || msg.audio) {
-    console.log(`🎤 Voice message received (chat: ${chatId}), processing...`);
-  } else if (process.env.NODE_ENV !== 'production') {
-    console.log(`📨 ទទួលសារពី chat ID: ${chatId}, ប្រភេទ: ${chatType}`);
-  }
 
   // ពិនិត្យថាតើ bot ត្រូវបាន mention នៅក្នុង group/supergroup
   let isMentioned = false;
@@ -462,10 +460,7 @@ bot.on('message', async (msg) => {
       try {
         const me = await bot.getMe();
         botUsername = me.username;
-        console.log(`🤖 Bot username: @${botUsername}`);
-      } catch (error) {
-        console.error('កំហុសក្នុងការទាញយក bot info:', error);
-      }
+      } catch (error) {}
     }
     
     // ពិនិត្យ @mention ក្នុងអត្ថបទ
@@ -537,12 +532,7 @@ bot.on('message', async (msg) => {
       }
       imageBuffer = Buffer.concat(chunks);
       
-      if (process.env.NODE_ENV !== 'production') {
-        console.log(`📷 ទទួលរូបភាព: ${file.file_path} (${imageBuffer.length} bytes)`);
-      }
-    } catch (error) {
-      console.error('កំហុសក្នុងការទាញយករូបភាព:', error);
-    }
+    } catch (error) {}
   }
 
   // Handle documents (images sent as files) with size limits
@@ -569,12 +559,7 @@ bot.on('message', async (msg) => {
       }
       imageBuffer = Buffer.concat(chunks);
       
-      if (process.env.NODE_ENV !== 'production') {
-        console.log(`📷 ទទួលរូបភាពជាឯកសារ: ${msg.document.file_name}`);
-      }
-    } catch (error) {
-      console.error('កំហុសក្នុងការទាញយកឯកសាររូបភាព:', error);
-    }
+    } catch (error) {}
   }
 
   // Handle voice messages (speech-to-text)
@@ -598,18 +583,15 @@ bot.on('message', async (msg) => {
         chunks.push(chunk);
       }
       const voiceBuffer = Buffer.concat(chunks);
-      console.log(`🎤 Voice downloaded: ${voiceBuffer.length} bytes, transcribing...`);
       const languageCode = process.env.SPEECH_LANGUAGE || 'km-KH';
       const transcribed = await speechService.transcribe(voiceBuffer, languageCode);
       if (transcribed && transcribed.trim().length > 0) {
         userMessage = transcribed.trim();
-        console.log(`📝 Transcribed: "${userMessage.slice(0, 80)}${userMessage.length > 80 ? '…' : ''}"`);
       } else {
         await bot.sendMessage(chatId, '⚠️ ខ្ញុំអានសំឡេងមិនច្បាស់ ឬមិនមានកម្មវិធីអានសំឡេង។ សូមសាកថាម្តងទៀត ឬវាយអត្ថបទ។');
         return;
       }
     } catch (error) {
-      console.error('កំហុសអានសំឡេង:', error);
       await bot.sendMessage(chatId, '⚠️ មានបញ្ហាក្នុងការអានសំឡេង។ សូមវាយអត្ថបទ។');
       return;
     }
@@ -636,7 +618,6 @@ bot.on('message', async (msg) => {
   if (userMessage) {
     const urls = extractUrls(userMessage, entities);
     if (urls.length > 0) {
-      console.log(`🔄 Real-time event detected: ${urls.length} URL(s)`);
       
       // Step 1: Fetch from live source (API / RSS / Scraper)
       // Step 2: Backend (fetch + clean + compress)
@@ -644,12 +625,10 @@ bot.on('message', async (msg) => {
       
       if (realtimeResult.success) {
         realtimeData = realtimeResult.data;
-        console.log(`✅ Real-time data processed: ${realtimeData.type} (${realtimeData.content.length} chars)`);
         
         // Append processed real-time data to message for Gemini
         cleanMessage += `\n\n[ទិន្នន័យពីប្រភពផ្ទាល់ពេល]\n${realtimeData.content}`;
       } else {
-        console.warn(`⚠️  Real-time processing failed: ${realtimeResult.error}`);
       }
     }
   }
@@ -731,25 +710,15 @@ bot.on('message', async (msg) => {
         imagePrompt = 'beautiful artistic image';
       }
 
-      console.log(`🎨 Image generation requested: ${imagePrompt}`);
-      
       // Generate image with conversation context
       const imageResult = await geminiService.generateImage(imagePrompt, chatId, '1:1', '1K');
       
       clearInterval(typingInterval);
       
-      console.log(`📊 Image generation result:`, {
-        success: imageResult.success,
-        hasImageData: !!imageResult.imageData,
-        imageDataLength: imageResult.imageData?.length || 0,
-        error: imageResult.error
-      });
-      
       if (imageResult.success && imageResult.imageData) {
         try {
           // Convert base64 to buffer
           const imageBuffer = Buffer.from(imageResult.imageData, 'base64');
-          console.log(`✅ Converted to buffer: ${imageBuffer.length} bytes`);
           
           // Send image to Telegram with self-aware contextual response
           // Generate a response where she's aware she created and is sending the image
@@ -762,13 +731,10 @@ bot.on('message', async (msg) => {
           await bot.sendPhoto(chatId, imageBuffer, {
             caption: contextualResponse || `ខ្ញុំបានបង្កើតរូបនេះសម្រាប់អ្នក! 💕`
           });
-          console.log(`✅ Image generated and sent successfully with contextual response!`);
         } catch (sendError) {
-          console.error('❌ Error sending image to Telegram:', sendError);
           await bot.sendMessage(chatId, `អូ... មិនអាចផ្ញើរូបបាន: ${sendError.message}`);
         }
       } else {
-        console.log(`❌ Image generation failed: ${imageResult.error || 'Unknown error'}`);
         await bot.sendMessage(chatId, `អូ... មិនអាចបង្កើតរូបបាន: ${imageResult.error || 'មានបញ្ហាបន្តិច'}`);
       }
       return;
@@ -793,7 +759,6 @@ bot.on('message', async (msg) => {
             throw new Error('TTS Service not initialized');
           }
 
-          console.log('🎤 Converting text to speech...');
           const tempFile = await ttsService.textToSpeechFile(
           response, 
           'km-KH', 
@@ -806,29 +771,21 @@ bot.on('message', async (msg) => {
         await bot.sendVoice(chatId, tempFile);
           
           // Clean up temp file
-          await fs.unlink(tempFile).catch((err) => {
-            console.warn('⚠️  Could not delete temp file:', err.message);
-          });
-        
-          console.log('✅ Voice message sent successfully!');
+          await fs.unlink(tempFile).catch(() => {});
         } catch (ttsError) {
-          console.error('❌ TTS Error:', ttsError);
           // Fallback to text message if TTS fails
-          await bot.sendMessage(chatId, response);
+          await sendFormattedMessage(chatId, response);
           await bot.sendMessage(chatId, '⚠️ មិនអាចបន្លឺសំឡេងបាន ប៉ុន្តែបានផ្ញើជាអត្ថបទហើយ!');
         }
       return;
     }
 
-    // Send normal text message
-    await bot.sendMessage(chatId, response);
+    // Send normal text message (with markdown rendered as bold/code/links)
+    await sendFormattedMessage(chatId, response);
   } catch (error) {
-    console.error('កំហុស:', error);
     try {
       await bot.sendMessage(chatId, 'មានបញ្ហាក្នុងការដំណើរការ។ សូមព្យាយាមម្តងទៀត!');
-    } catch (sendError) {
-      console.error('មិនអាចផ្ញើសារកំហុស:', sendError);
-    }
+    } catch (sendError) {}
   }
   }
 });
@@ -864,13 +821,9 @@ bot.on('polling_error', (error) => {
   if (error.code === 'ETELEGRAM' && error.response && error.response.body) {
     const errorBody = error.response.body;
     if (errorBody.error_code === 409) {
-      console.error('⚠️  409: Another bot instance is receiving updates (only ONE can poll at a time).');
-      console.error('⚠️  Stop the other instance so this server gets messages: close other terminals running this bot, or pause/stop the bot on Render (or other host).');
-      // Don't exit, just log - the bot will retry
       return;
     }
   }
-  console.error('កំហុស polling:', error.message || error);
 });
 
 // Catch-all handler for React routing (must be last)
@@ -885,22 +838,12 @@ app.get('*', (req, res) => {
 
 // ចាប់ផ្តើម Express server
 app.listen(PORT, async () => {
-  console.log(`🚀 Server កំពុងដំណើរការនៅ port ${PORT}`);
-  console.log(`🤖 Telegram bot សកម្ម!`);
-  console.log(`🧠 Gemini AI ត្រូវបានកំណត់!`);
-  console.log(`🏓 Keep-alive ping scheduled every 12 minutes`);
-  if (TELEGRAM_CHAT_ID) {
-    console.log(`📱 Bot ត្រូវបានកំណត់សម្រាប់ chat ID: ${TELEGRAM_CHAT_ID}`);
-  }
-  
   if (TELEGRAM_CHAT_ID && GEMINI_API_KEY) {
     try {
       await bot.sendMessage(
         TELEGRAM_CHAT_ID, 
         '🤖 Rabica Bot បានចាប់ផ្តើមដំណើរការ! ខ្ញុំរួមចំណែកហើយ! 😄'
       );
-    } catch (error) {
-      console.log('⚠️  មិនអាចផ្ញើសារចាប់ផ្តើម');
-    }
+    } catch (error) {}
   }
 });

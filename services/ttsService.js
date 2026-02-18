@@ -34,36 +34,19 @@ class TTSService {
           
           // OAuth client secrets have "web" or "installed" keys, not "type": "service_account"
           if (credsJson.web || credsJson.installed || credsJson.client_secret) {
-            console.warn(`⚠️ TTS: OAuth client secrets detected - cannot be used for TTS.`);
-            console.warn(`⚠️ You need a Service Account JSON key file (with "type": "service_account").`);
-            console.warn(`⚠️ Get it from: https://console.cloud.google.com/iam-admin/serviceaccounts`);
-            console.warn(`⚠️ Using Female Fallback TTS instead.`);
-            return; // Skip TTS initialization
+            return;
           }
           
-          // Check if it's a service account file
           if (credsJson.type !== 'service_account') {
-            console.warn(`⚠️ TTS: Credentials file doesn't appear to be a service account.`);
-            console.warn(`⚠️ Expected "type": "service_account" in the JSON file.`);
-            console.warn(`⚠️ Using Female Fallback TTS instead.`);
-            return; // Skip TTS initialization
+            return;
           }
           
-          // Valid service account found
           this.credentialsPath = credsPath;
           this.projectId = credsJson.project_id || process.env.GOOGLE_CLOUD_PROJECT;
           this.useGeminiTTS = true;
-          console.log(`✅ TTS: Gemini TTS initialized`);
-          console.log(`📁 Using credentials: ${credsPath}`);
-          console.log(`📦 Project ID: ${this.projectId || 'Not set'}`);
         }
-      } catch (readError) {
-        console.warn(`⚠️ TTS: Could not read credentials file: ${readError.message}`);
-      }
-    } else {
-      console.warn("⚠️ TTS: No credentials path found. Using Female Fallback.");
-      console.warn("⚠️ To enable Gemini TTS, set GOOGLE_APPLICATION_CREDENTIALS in .env");
-    }
+      } catch (readError) {}
+    } else {}
   }
 
   /**
@@ -98,7 +81,6 @@ class TTSService {
       
       return this.accessToken;
     } catch (error) {
-      console.error("[TTS] Error getting access token:", error);
       throw new Error(`Failed to authenticate with Google Cloud: ${error.message}`);
     }
   }
@@ -238,7 +220,6 @@ class TTSService {
     if (!stylePrompt) {
       stylePrompt = this.detectEmotionAndGenerateStylePrompt(textToConvert);
       if (stylePrompt && process.env.NODE_ENV !== 'production') {
-        console.log(`🎭 Detected emotion style: ${stylePrompt.substring(0, 60)}...`);
       }
     }
 
@@ -304,17 +285,14 @@ class TTSService {
             if (response.ok) {
               const data = await response.json();
               if (data.audioContent) {
-                console.log(`✅ Gemini TTS Generated (${model} - ${speaker}): ${Date.now() - startTime}ms`);
                 return Buffer.from(data.audioContent, 'base64');
               }
             } else {
               const errorText = await response.text();
-              console.log(`⚠️ Gemini TTS Error (${model} - ${speaker}): ${response.status} - ${errorText.substring(0, 100)}`);
               // Continue to next voice/model
               continue;
             }
           } catch (error) {
-            console.log(`⚠️ Gemini TTS Error (${model} - ${speaker}): ${error.message}`);
             // Continue to next voice/model
             continue;
           }
@@ -322,7 +300,6 @@ class TTSService {
       }
       
       // If all Gemini models/voices failed
-      console.error("⚠️ All Gemini TTS models failed, falling back to Free TTS");
     }
 
     // --- STRATEGY 2: Free Fallback (FEMALE ONLY) ---
@@ -343,7 +320,6 @@ class TTSService {
           // Add delay for retries (exponential backoff for rate limits)
           if (retry > 0) {
             const delay = Math.min(1000 * Math.pow(2, retry - 1), 5000); // 1s, 2s, 4s max
-            console.log(`⏳ Retrying free TTS (attempt ${retry + 1}/${maxRetries}) after ${delay}ms delay...`);
             await new Promise(resolve => setTimeout(resolve, delay));
           }
           
@@ -376,7 +352,6 @@ class TTSService {
           
           const buffer = await response.buffer();
           if (buffer && buffer.length > 0) {
-            console.log(`✅ Free TTS Generated (Female): ${Date.now() - startTime}ms`);
             return buffer;
           } else {
             lastError = new Error('Empty response from TTS service');

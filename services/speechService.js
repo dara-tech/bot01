@@ -19,13 +19,8 @@ class SpeechService {
     if (SpeechClient) {
       try {
         this.client = new SpeechClient();
-        console.log('✅ Speech-to-Text (voice messages): Google Cloud Speech initialized');
-      } catch (err) {
-        console.warn('⚠️ Speech-to-Text: Could not initialize client:', err.message);
-      }
-    } else {
-      console.warn('⚠️ Speech-to-Text: @google-cloud/speech not installed. Voice messages will be ignored.');
-    }
+      } catch (err) {}
+    } else {}
   }
 
   /**
@@ -40,7 +35,6 @@ class SpeechService {
       return '';
     }
     if (audioBuffer.length > MAX_VOICE_SIZE) {
-      console.warn(`⚠️ Voice message too large (${audioBuffer.length} bytes), skipping STT`);
       return '';
     }
 
@@ -90,7 +84,6 @@ class SpeechService {
       });
       return getText(fallbackResponse) || '';
     } catch (err) {
-      console.error('Speech-to-Text error:', err.message);
       return '';
     }
   }

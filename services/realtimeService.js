@@ -20,7 +20,6 @@ class RealtimeService {
    */
   async fetchAndClean(url) {
     try {
-      console.log(`🔄 Fetching real-time data from: ${url}`);
       
       const response = await fetch(url, {
         headers: {
@@ -60,7 +59,6 @@ class RealtimeService {
       return this.compressText(text);
       
     } catch (error) {
-      console.error(`❌ Error fetching real-time data: ${error.message}`);
       throw new Error(`Failed to fetch data: ${error.message}`);
     }
   }
@@ -238,7 +236,6 @@ class RealtimeService {
       // Step 2: Data is already cleaned and compressed in fetchAndClean
       // Step 3: Return processed data (nothing saved)
       
-      console.log(`✅ Real-time data processed: ${rawData.type} (${rawData.content.length} chars)`);
       
       return {
         success: true,
@@ -246,7 +243,6 @@ class RealtimeService {
         source: source
       };
     } catch (error) {
-      console.error(`❌ Real-time processing failed: ${error.message}`);
       return {
         success: false,
         error: error.message,
