@@ -303,12 +303,15 @@ class TTSService {
     }
 
     // --- STRATEGY 2: Free Fallback (FEMALE ONLY) ---
-    // Note: There is no way to get a male voice from this free URL.
-    // Try multiple TTS endpoints for better reliability
+    // Translate TTS accepts ~100–200 chars per request; long text causes 414 or empty response.
+    const MAX_FREE_TTS_CHARS = 200;
+    const textForFree = textToConvert.length > MAX_FREE_TTS_CHARS
+      ? textToConvert.substring(0, MAX_FREE_TTS_CHARS).trim() + '…'
+      : textToConvert;
     const freeTtsUrls = [
-      `https://translate.google.com/translate_tts?ie=UTF-8&tl=${languageCode}&client=tw-ob&q=${encodeURIComponent(textToConvert)}`,
-      `https://translate.google.com/translate_tts?ie=UTF-8&tl=${languageCode}&client=gtx&q=${encodeURIComponent(textToConvert)}`,
-      `https://translate.google.com/translate_tts?ie=UTF-8&tl=${languageCode}&q=${encodeURIComponent(textToConvert)}`
+      `https://translate.google.com/translate_tts?ie=UTF-8&tl=${languageCode}&client=tw-ob&q=${encodeURIComponent(textForFree)}`,
+      `https://translate.google.com/translate_tts?ie=UTF-8&tl=${languageCode}&client=gtx&q=${encodeURIComponent(textForFree)}`,
+      `https://translate.google.com/translate_tts?ie=UTF-8&tl=${languageCode}&q=${encodeURIComponent(textForFree)}`
     ];
     
     let lastError = null;

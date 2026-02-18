@@ -177,12 +177,13 @@ if (!credentialsPath) {
 
 // Initialize TTS service with found credentials or use fallback
 if (credentialsPath) {
+  process.env.GOOGLE_APPLICATION_CREDENTIALS = credentialsPath;
   ttsService = new TTSService(credentialsPath);
 } else {
   ttsService = new TTSService();
 }
 
-// Initialize Speech-to-Text (voice messages)
+// Initialize Speech-to-Text (voice messages) - uses GOOGLE_APPLICATION_CREDENTIALS set above
 const speechService = new SpeechService();
 
 // Initialize Real-time Event Service
@@ -592,7 +593,9 @@ bot.on('message', async (msg) => {
         return;
       }
     } catch (error) {
-      await bot.sendMessage(chatId, '⚠️ មានបញ្ហាក្នុងការអានសំឡេង។ សូមវាយអត្ថបទ។');
+      try {
+        await bot.sendMessage(chatId, '⚠️ មានបញ្ហាក្នុងការអានសំឡេង។ សូមវាយអត្ថបទ។');
+      } catch (sendErr) {}
       return;
     }
   }
@@ -773,7 +776,9 @@ bot.on('message', async (msg) => {
           // Clean up temp file
           await fs.unlink(tempFile).catch(() => {});
         } catch (ttsError) {
-          // Fallback to text message if TTS fails
+          if (process.env.NODE_ENV !== 'production') {
+            console.warn('[TTS] Failed:', ttsError?.message || ttsError);
+          }
           await sendFormattedMessage(chatId, response);
           await bot.sendMessage(chatId, '⚠️ មិនអាចបន្លឺសំឡេងបាន ប៉ុន្តែបានផ្ញើជាអត្ថបទហើយ!');
         }

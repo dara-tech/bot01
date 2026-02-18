@@ -19,8 +19,14 @@ class SpeechService {
     if (SpeechClient) {
       try {
         this.client = new SpeechClient();
-      } catch (err) {}
-    } else {}
+      } catch (err) {
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn('[SpeechService] SpeechClient init failed:', err.message);
+        }
+      }
+    } else if (process.env.NODE_ENV !== 'production') {
+      console.warn('[SpeechService] @google-cloud/speech not installed or load failed');
+    }
   }
 
   /**
@@ -84,6 +90,9 @@ class SpeechService {
       });
       return getText(fallbackResponse) || '';
     } catch (err) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('[SpeechService] transcribe error:', err.message);
+      }
       return '';
     }
   }
